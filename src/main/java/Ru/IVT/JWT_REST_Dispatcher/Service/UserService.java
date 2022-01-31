@@ -1,5 +1,6 @@
 package Ru.IVT.JWT_REST_Dispatcher.Service;
 
+import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
 import Ru.IVT.JWT_REST_Dispatcher.Model.User;
 
 import java.util.List;
@@ -22,4 +23,6 @@ public interface UserService {
     User findById(Long id);
 
     void delete(Long id);
+
+    User registerNewUserAccount(UserDto userDto) throws IllegalArgumentException, Exception;
 }

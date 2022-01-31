@@ -1,6 +1,8 @@
 package Ru.IVT.JWT_REST_Dispatcher.REST;
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.AuthenticationRequestDto;
+import Ru.IVT.JWT_REST_Dispatcher.DTO.RegisterRequestDto;
+import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
 import Ru.IVT.JWT_REST_Dispatcher.Security.Jwt.JwtTokenProvider;
 import Ru.IVT.JWT_REST_Dispatcher.Model.User;
 import Ru.IVT.JWT_REST_Dispatcher.Service.UserService;
@@ -12,8 +14,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.ui.Model;
+import org.springframework.validation.Errors;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,7 +32,7 @@ import java.util.Map;
  */
 
 @RestController
-@RequestMapping(value = "/api/v1/auth/")
+@RequestMapping(value = "/api/auth/")
 public class AuthenticationRestControllerV1 {
 
     private final AuthenticationManager authenticationManager;
@@ -73,6 +79,45 @@ public class AuthenticationRestControllerV1 {
         }
     }
 
+//    @PostMapping("registration")
+//    public ModelAndView registerUserAccount(
+//            @ModelAttribute("user") @Valid UserDto userDto,
+//            HttpServletRequest request,
+//            Errors errors) throws Exception {
+//
+//        try {
+//            User registered = userService.registerNewUserAccount(userDto);
+//        } catch (Exception uaeEx) {
+//            throw new Exception("Не удалось зарегистрировать");
+////            mav.addObject("message", "An account for that username/email already exists.");
+////            return mav;
+//        }
+//
+//        return new ModelAndView("successRegister", "user", userDto);
+//    }
 
+//    @PostMapping("registration")
+//    public ModelAndView registerUserAccount(@RequestBody RegisterRequestDto requestDto) throws Exception {
+//
+//        UserDto userDto = new UserDto();
+//        userDto.setUsername(requestDto.getUsername());
+//        userDto.setFirstName(requestDto.getFirstName());
+//        userDto.setLastName(requestDto.getLastName());
+//        userDto.setPassword(requestDto.getPassword());
+//        userDto.setEmail(requestDto.getEmail());
+//
+//        try {
+//
+//
+//
+//            User registered = userService.registerNewUserAccount(userDto);
+//        } catch (Exception uaeEx) {
+//            throw new Exception("Не удалось зарегистрировать");
+////            mav.addObject("message", "An account for that username/email already exists.");
+////            return mav;
+//        }
+//
+//        return new ModelAndView("successRegister", "user", userDto);
+//    }
 
 }
