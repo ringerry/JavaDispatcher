@@ -1,31 +1,53 @@
 package Ru.IVT.JWT_REST_Dispatcher.Service.Impl;
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
+import Ru.IVT.JWT_REST_Dispatcher.Model.Constanta;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
-import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepository;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.UserRepository;
+import Ru.IVT.JWT_REST_Dispatcher.Security.Jwt.JwtTokenProvider;
+import Ru.IVT.JWT_REST_Dispatcher.Service.TaskLimitException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
 
 
 @Service
+@Slf4j
 public class TaskServiceImpl implements TaskService {
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
+//    private final JwtTokenProvider jwtTokenProvider;
 
     @Autowired
-    public TaskServiceImpl(UserRepository userRepository, TaskRepository taskRepository) {
+    public TaskServiceImpl(UserRepository userRepository, TaskRepository taskRepository/*,
+                           JwtTokenProvider jwtTokenProvider*/) {
         this.userRepository = userRepository;
         this.taskRepository = taskRepository;
+//        this.jwtTokenProvider = jwtTokenProvider;
     }
 
+    private boolean isReachAddTaskLimit(Long userId/*,String token*/) {
+
+
+
+//        Date tokenIssueAt = jwtTokenProvider.getIssueAt(token);
+        Date now = new Date();
+        Date hour_before = new Date(now.getTime() - Constanta.taskWindowLimitInMilliseconds);
+
+        if(taskRepository.countUserTasksBetween2Dates(userId,hour_before,now)<Constanta.maxLimitTaskAtTokenTime)
+            return true;
+        else   return  false;
+
+    }
+
+
     @Override
-    public Task saveTask(NewTaskDto newTaskDto ) throws Exception {
+    public Task saveTask(NewTaskDto newTaskDto/*,String token*/ ) throws Exception {
 
         try {
 
@@ -38,7 +60,13 @@ public class TaskServiceImpl implements TaskService {
             newTask.setCreated(new Date());
             newTask.setUpdated(new Date());
 
-            return taskRepository.save(newTask);
+            if(this.isReachAddTaskLimit(newTaskDto.getUser_id()))
+                return taskRepository.save(newTask);
+            else{
+                throw new TaskLimitException("Превышено максимальное количество задач за время сессии." +
+                        "Разрешено загружать "+Constanta.maxLimitTaskAtTokenTime.toString()+" задач(-и,-у)" +
+                        " за "+Constanta.taskWindowLimitInMilliseconds/60000+" минут.");
+            }
 //            return true;
         }
         catch (IllegalArgumentException exception){

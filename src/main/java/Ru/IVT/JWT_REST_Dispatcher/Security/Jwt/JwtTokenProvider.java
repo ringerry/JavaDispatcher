@@ -50,6 +50,8 @@ public class JwtTokenProvider {
         return bCryptPasswordEncoder;
     }
 
+    public static long getValidityInMilliseconds(){return validityInMilliseconds;}
+
     @PostConstruct
     protected void init() {
         secret = Base64.getEncoder().encodeToString(secret.getBytes());
@@ -87,6 +89,13 @@ public class JwtTokenProvider {
         }
         return null;
     }
+
+    public Date getIssueAt(String token){
+        Jws<Claims> claims = Jwts.parser().setSigningKey(secret).parseClaimsJws(token);
+
+        return claims.getBody().getIssuedAt();
+    }
+
 
     public boolean validateToken(String token) {
         try {
