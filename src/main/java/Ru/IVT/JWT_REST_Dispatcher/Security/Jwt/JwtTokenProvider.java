@@ -34,11 +34,11 @@ import java.util.List;
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.token.secret}")
-    private String secret;
+//    @Value("${jwt.token.secret}")
+    private static String secret="IVTFAVT";
 
-    @Value("${jwt.token.expired}")
-    private long validityInMilliseconds;
+//    @Value("${jwt.token.expired}")
+    private static long validityInMilliseconds=3600000;
 
 
     @Autowired

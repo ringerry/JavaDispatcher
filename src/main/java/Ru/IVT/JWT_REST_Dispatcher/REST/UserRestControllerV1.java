@@ -1,5 +1,11 @@
 package Ru.IVT.JWT_REST_Dispatcher.REST;
 
+import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
+import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.DispathcerProvider;
+import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
+import Ru.IVT.JWT_REST_Dispatcher.Model.User;
+import Ru.IVT.JWT_REST_Dispatcher.Security.Jwt.JwtTokenProvider;
+import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,10 +14,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.UUID;
 
 /**
@@ -27,13 +32,17 @@ import java.util.UUID;
 public class UserRestControllerV1 {
 
     private final UserService userService;
+    private final TaskService taskService;
+//    private final DispathcerProvider dispathcerProvider;
 
     @Value("${local.paths.save.taskSources}")
     private String taskUploadPath;
 
     @Autowired
-    public UserRestControllerV1(UserService userService) {
+    public UserRestControllerV1(UserService userService, TaskService taskService/*, DispathcerProvider dispathcerProvider*/) {
         this.userService = userService;
+        this.taskService = taskService;
+//        this.dispathcerProvider = dispathcerProvider;
     }
 
     @GetMapping(value = "hello")
@@ -44,24 +53,67 @@ public class UserRestControllerV1 {
 
     @PostMapping(value = "add_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String>
-        addTask(@RequestParam("task_name") String TaskName,
-                @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile) throws Exception {
-
+        addTask(@RequestHeader("Authorization") String token,
+                @RequestParam("task_name") String TaskName,
+                @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile,
+                @RequestParam("TaskDatfFile")MultipartFile TaskDataFile) throws Exception {
 
         try{
+
+
             if(TaskSourcesFile != null){
                 File uploadDir = new File(taskUploadPath);
                 if (!uploadDir.exists()){
                     uploadDir.mkdir();
                 }
 
+                // Сохранение исходников
                 String [] fileParts = TaskSourcesFile.getOriginalFilename().split("[.]");
-
                 String uniqFileName = UUID.randomUUID().toString();
-
                 String resFileName =  fileParts[0]+"."+ uniqFileName+"."+fileParts[1];
+                String sourceFileAllPath = taskUploadPath +"\\"+ resFileName;
+                TaskSourcesFile.transferTo(new File(sourceFileAllPath));
 
-                TaskSourcesFile.transferTo(new File(taskUploadPath +"\\"+ resFileName));
+                // Сохранение данных
+                fileParts = TaskDataFile.getOriginalFilename().split("[.]");
+                uniqFileName = UUID.randomUUID().toString();
+                resFileName =  fileParts[0]+"."+ uniqFileName+"."+fileParts[1];
+                String dataFileAllPath = taskUploadPath +"\\"+ resFileName;
+                TaskDataFile.transferTo(new File(dataFileAllPath));
+
+                //Добавление записи в БД==
+
+
+                // Получени имени по токену=
+                JwtTokenProvider jwtTokenProvider = new JwtTokenProvider();
+                token = token.replace ("Bearer_", "");
+                String UserName = jwtTokenProvider.getUsername(token);
+                User User1 = userService.findByUsername(UserName);
+
+
+
+                NewTaskDto newTaskDto = new NewTaskDto();
+                newTaskDto.setTask_name(TaskName);
+                newTaskDto.setUser_id(User1.getId());
+                newTaskDto.setData_file_name(dataFileAllPath);
+                newTaskDto.setSource_file_name(sourceFileAllPath);
+
+
+
+                //Если диспетчер свободен сразу запустить, иначе в очередь(по сути ничего не делать: диспетчер сам
+                // знает очередь по таблицам )
+
+                if(true/*!dispathcerProvider.isDispatcherComputing()*/){
+                    newTaskDto.setStatus(TaskStatusEnum.ВЫПОЛНЕНИЕ);
+                    Task task = taskService.saveTask(newTaskDto);
+
+                    Long a = task.getId();
+                    Long b = Long.valueOf(1);
+
+//                    dispathcerProvider.run(task.getId());
+
+                }
+
 
                 return new ResponseEntity<>("Задача "+ TaskName+" добавлена в обработку. " +
                         "Имя файла:"+ TaskSourcesFile.getOriginalFilename()+".",

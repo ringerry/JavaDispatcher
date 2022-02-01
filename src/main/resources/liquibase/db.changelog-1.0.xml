@@ -160,4 +160,70 @@
 
     </changeSet>
 
+    <changeSet id="1.0.9" author="МеньшиковАртём">
+        <sql>ALTER TABLE "task"  ADD file_name TEXT NOT NULL DEFAULT 'Неизвестно';</sql>
+
+    </changeSet>
+
+    <changeSet id="1.0.10" author="МеньшиковАртём">
+        <createTable tableName="task_in_run">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="name" type="TEXT">
+                <constraints nullable="false" unique="true"/>
+            </column>
+
+            <column name="created" type="TIMESTAMPTZ" defaultValueComputed=" CURRENT_TIMESTAMP  + INTERVAL '3 hours'">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="updated" type="TIMESTAMPTZ" defaultValueComputed=" CURRENT_TIMESTAMP  + INTERVAL '3 hours'">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="status" type="TEXT" defaultValue="ДЕЙСТВУЮЩИЙ">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="1.0.11" author="МеньшиковАртём">
+        <sql>ALTER TABLE "task_in_run"  ADD task_id BIGINT NOT NULL ;</sql>
+
+    </changeSet>
+
+    <changeSet id="1.0.12" author="МеньшиковАртём">
+
+        <addForeignKeyConstraint baseColumnNames="task_id"
+                                 baseTableName="task_in_run"
+                                 constraintName="fk_task_in_run_task_id"
+                                 onDelete="CASCADE"
+                                 onUpdate="CASCADE"
+                                 referencedColumnNames="id"
+                                 referencedTableName="task"
+        />
+
+    </changeSet>
+
+    <changeSet id="1.0.13" author="МеньшиковАртём">
+        <sql>ALTER TABLE task RENAME COLUMN file_name TO source_file_name;</sql>
+        <sql>ALTER TABLE task ALTER COLUMN source_file_name DROP DEFAULT;</sql>
+
+        <sql>ALTER TABLE task ADD COLUMN data_file_name TEXT NULL;</sql>
+
+
+
+    </changeSet>
+
+    <changeSet id="1.0.14" author="МеньшиковАртём">
+        <sql>ALTER TABLE task ALTER COLUMN status TYPE TEXT ;</sql>
+
+
+
+    </changeSet>
+
+
+
 </databaseChangeLog>
