@@ -64,13 +64,16 @@ public class TaskServiceImpl implements TaskService {
                 return taskRepository.save(newTask);
             else{
                 throw new TaskLimitException("Превышено максимальное количество задач за время сессии." +
-                        "Разрешено загружать "+Constanta.maxLimitTaskAtTokenTime.toString()+" задач(-и,-у)" +
+                        " Разрешено загружать "+Constanta.maxLimitTaskAtTokenTime.toString()+" задач(-и,-у)" +
                         " за "+Constanta.taskWindowLimitInMilliseconds/60000+" минут.");
             }
 //            return true;
         }
         catch (IllegalArgumentException exception){
             throw  new IllegalArgumentException(exception);
+        }
+        catch (TaskLimitException exc){
+            throw exc;
         }
         catch (Exception exc){
             throw  new Exception(exc.getCause());

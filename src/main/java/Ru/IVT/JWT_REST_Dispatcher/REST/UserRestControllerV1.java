@@ -18,6 +18,9 @@ import org.springframework.web.multipart.MultipartFile;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -54,7 +57,7 @@ public class UserRestControllerV1 {
     }
 
     @PostMapping(value = "add_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String>
+    public ResponseEntity
         addTask(@RequestHeader("Authorization") String token,
                 @RequestParam("TaskName") String TaskName,
                 @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile,
@@ -62,91 +65,70 @@ public class UserRestControllerV1 {
 
         try{
 
-
-            if(TaskSourcesFile != null){
+            if(!TaskSourcesFile.isEmpty()&& !TaskDataFile.isEmpty()){
                 File uploadDir = new File(taskUploadPath);
                 if (!uploadDir.exists()){
                     uploadDir.mkdir();
                 }
 
-                // Сохранение исходников
-                String [] fileParts = TaskSourcesFile.getOriginalFilename().split("[.]");
-                String uniqFileName = UUID.randomUUID().toString();
-                String resFileName =  fileParts[0]+"."+ uniqFileName+"."+fileParts[1];
-                String sourceFileAllPath = taskUploadPath +"\\"+ resFileName;
-                TaskSourcesFile.transferTo(new File(sourceFileAllPath));
-
-                // Сохранение данных
-                fileParts = TaskDataFile.getOriginalFilename().split("[.]");
-                uniqFileName = UUID.randomUUID().toString();
-                resFileName =  fileParts[0]+"."+ uniqFileName+"."+fileParts[1];
-                String dataFileAllPath = taskUploadPath +"\\"+ resFileName;
-                TaskDataFile.transferTo(new File(dataFileAllPath));
-
-                //Добавление записи в БД==
-
-
-                // Получени имени по токену=
-                JwtTokenProvider jwtTokenProvider = new JwtTokenProvider();
-                token = token.replace ("Bearer_", "");
-                String UserName = jwtTokenProvider.getUsername(token);
-                User User1 = userService.findByUsername(UserName);
-
-
-
                 NewTaskDto newTaskDto = new NewTaskDto();
                 newTaskDto.setTask_name(TaskName);
-                newTaskDto.setUser_id(User1.getId());
-                newTaskDto.setData_file_name(dataFileAllPath);
-                newTaskDto.setSource_file_name(sourceFileAllPath);
-
-
-
+                newTaskDto.setUser_id(getUserByToken(token).getId());
+                newTaskDto.setData_file_name(getWholeFilePath(TaskDataFile));
+                newTaskDto.setSource_file_name(getWholeFilePath(TaskSourcesFile));
 
 
                 // Добавить в очередь, диспетчер сам просканирует, что выполнять
                 newTaskDto.setStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
                 Task task = taskService.saveTask(newTaskDto);
 
-                //Если диспетчер свободен сразу запустить, иначе в очередь(по сути ничего не делать: диспетчер сам
-                // знает очередь по таблицам )
+                String msg = "Задача "+ TaskName+" добавлена в обработку. " +
+                        "Имя файла:"+ TaskSourcesFile.getOriginalFilename()+".";
+                Map<Object,Object> response = new HashMap<>();
 
-//                if(!dispathcerProvider.isDispatcherComputing()){
-//                    newTaskDto.setStatus(TaskStatusEnum.ВЫПОЛНЕНИЕ);
-//                    Task task = taskService.saveTask(newTaskDto);
-//
-//                    Long a = task.getId();
-//                    Long b = Long.valueOf(1);// отладка
-//
-//                    dispathcerProvider.run(task.getId());
-//
-//                }
-//                else {
-//                    newTaskDto.setStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
-//                    Task task = taskService.saveTask(newTaskDto);
-//                }
+                response.put("Описание",msg);
+                response.put("id_задачи",task.getId());
 
+                return ResponseEntity.ok(response);
 
-                return new ResponseEntity<>("Задача "+ TaskName+" добавлена в обработку. " +
-                        "Имя файла:"+ TaskSourcesFile.getOriginalFilename()+".",
-                        HttpStatus.OK);
             }
             else{
-                return new ResponseEntity<>("Нет имени задачи и/или файла",
-                        HttpStatus.NO_CONTENT);
-            }
 
+                Map<Object,Object> response = new HashMap<>();
+                response.put("Описание","Нет исходников и/или данных");
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            }
 
         }
         catch (TaskLimitException exc){
-            return new ResponseEntity<>(exc.toString(),
-                    HttpStatus.NOT_ACCEPTABLE);
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",exc.getMessage());
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
         }
         catch (Exception exception){
             throw new Exception(exception);
         }
 
 
+    }
+
+    private User getUserByToken(String token) {
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider();
+        token = token.replace ("Bearer_", "");
+        String UserName = jwtTokenProvider.getUsername(token);
+        User User1 = userService.findByUsername(UserName);
+        return User1;
+    }
+
+    private String getWholeFilePath(MultipartFile TaskSourcesFile) throws IOException {
+        String [] fileParts = TaskSourcesFile.getOriginalFilename().split("[.]");
+        String uniqFileName = UUID.randomUUID().toString();
+        String resFileName =  fileParts[0]+"."+ uniqFileName+"."+fileParts[1];
+        String sourceFileAllPath = taskUploadPath +"\\"+ resFileName;
+        TaskSourcesFile.transferTo(new File(sourceFileAllPath));
+        return sourceFileAllPath;
     }
 
 //    @PostMapping(value = "add_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
