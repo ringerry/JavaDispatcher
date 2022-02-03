@@ -33,5 +33,10 @@ public interface TaskRepositoryNonTransactional extends JpaRepository<Task, Long
             @Param("id") Long id,
             @Param("UserId") Long UserId);
 
+    @Query(value = "SELECT t FROM Task t WHERE t.id = :id AND t.user_id = :UserId")
+    Task getTaskById(
+            @Param("id") Long id,
+            @Param("UserId") Long UserId);
+
 
 }

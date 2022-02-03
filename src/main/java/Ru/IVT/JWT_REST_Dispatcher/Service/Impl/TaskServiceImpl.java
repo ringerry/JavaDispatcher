@@ -146,6 +146,21 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public Task getTaskById(Long taskId,Long UserId) throws Exception {
+
+
+        NewTaskDto newTaskDto = new NewTaskDto();
+
+        newTaskDto.setId(taskId);
+
+        if (isUserHaveTask(newTaskDto, UserId)){
+
+            return taskRepositoryNonTransactional.getTaskById(taskId,UserId);
+        }
+        else {throw new TaskDoesNotExistException("Задачи с "+taskId+" не существует.");}
+    }
+
+    @Override
     public Task getTaskByName(String taskName) throws Exception {
         Task task = taskRepositoryNonTransactional.getTaskByName(taskName);
 

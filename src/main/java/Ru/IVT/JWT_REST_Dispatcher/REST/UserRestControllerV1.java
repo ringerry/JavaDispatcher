@@ -338,6 +338,101 @@ public class UserRestControllerV1 {
 
     }
 
+    @PostMapping(value = "task_status",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    getTaskStatus(@RequestHeader("Authorization") String token,
+                  @RequestParam(value = "TaskName") String TaskName,
+                  @RequestParam(value = "TaskId") Long TaskId) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+            User User1 = getUserByToken(token);
+
+            Task task = taskService.getTaskById(TaskId,User1.getId());
+
+            // подготовка в json
+
+            String msg = "Состояние задачи ";
+            Map<Object,Object> response = new HashMap<>();
+
+            response.put("Описание",msg);
+            response.put("Состояние",task.getStatus().toString());
+            response.put("Id_задачи",task.getId());
+//                response.put("id_задачи",task.getId());
+
+            return ResponseEntity.ok(response);
+
+        }
+        catch (TaskDoesNotExistException e ){
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+    @PostMapping(value = "run_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    runTask(@RequestHeader("Authorization") String token,
+                  @RequestParam(value = "TaskName") String TaskName,
+                  @RequestParam(value = "TaskId") Long TaskId) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+
+            Task runTask = taskService.getTaskById(TaskId);
+
+            if(runTask.getStatus()==TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА){
+                User User1 = getUserByToken(token);
+
+                NewTaskDto newTaskDto = new NewTaskDto();
+                newTaskDto.setId(TaskId);
+                newTaskDto.setStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
+
+                taskService.updateTaskStatus(newTaskDto,User1.getId());
+
+
+                String msg = "Задача добавленая в очередь выполнения.";
+                Map<Object,Object> response = new HashMap<>();
+
+                response.put("Описание",msg);
+                response.put("Состояние",TaskStatusEnum.В_ОЧЕРЕДИ);
+                response.put("Id_задачи",TaskId);
+
+                return ResponseEntity.ok(response);
+            }
+            else{
+
+                String msg = "Невозоможно запустить задачу. Отстствуют исходники или данные.";
+
+                Map<Object,Object> response = new HashMap<>();
+                response.put("Описание",msg);
+                response.put("Состояние",runTask.getStatus());
+                response.put("Id_задачи",runTask.getId());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
+
+
+        }
+        catch (TaskDoesNotExistException e ){
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
 
     private ResponseEntity getResponseEntityUpdateTask(String token,
                                                        String taskName,
@@ -368,15 +463,8 @@ public class UserRestControllerV1 {
                 NewTaskDto newTaskDto = getNewTaskDto(token, taskName, taskId, taskSourcesFile, taskDataFile);
                 newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
 
-                // Добавить в очередь, диспетчер сам просканирует, что выполнять
-//                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
 
-                if(taskId==null){
-                    taskService.updateTaskFilesById(newTaskDto,UserId);
-                }
-                else{
-                    taskService.updateTaskFilesById(newTaskDto,UserId);
-                }
+                taskService.updateTaskFilesById(newTaskDto,UserId);
 
                 Task task = taskService.getTaskById(newTaskDto.getId());
 
@@ -384,6 +472,8 @@ public class UserRestControllerV1 {
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
+                response.put("Id_задачи",task.getId());
+                response.put("Состояние",TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
 //                response.put("id_задачи",task.getId());
 
                 return ResponseEntity.ok(response);
@@ -402,37 +492,31 @@ public class UserRestControllerV1 {
                 newTaskDto.setData_file_name(taskService.getTaskById(taskId).getData_file_name());
                 newTaskDto.setStatus(taskService.getTaskById(taskId).getStatus());
 
-                if(taskId==null){
-                    taskService.updateTaskFilesById(newTaskDto,UserId);
-                }
-                else{
-                    taskService.updateTaskFilesById(newTaskDto,UserId);
-                }
+                String oldDataFileName = taskService.getTaskById(taskId).getData_file_name();
+                TaskStatusEnum TaskState = taskService.getTaskById(taskId).getStatus();
+
+                taskService.updateTaskFilesById(newTaskDto,UserId);
 
                 Task retTask = taskService.getTaskById(taskId);
-                if (retTask.getSource_file_name()!=null&&retTask.getData_file_name()!=null){
+                if (oldDataFileName != null){
                     newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
+                    TaskState = TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА;
                 }
-                else if(retTask.getSource_file_name()==null&&retTask.getData_file_name()!=null){
-                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ);
-                }
-                else if  (retTask.getSource_file_name()!=null&&retTask.getData_file_name()==null){
+                else {
                     newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ);
+                    TaskState = TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ;
                 }
 
                 taskService.updateTaskStatus(newTaskDto,UserId);
 
-
-//                // Состояние смена
-//                if (taskService.getTaskByName(taskName).getStatus()==TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ){}
-//                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
 
                 String msg = "Исходники к задаче "+ retTask.getName()+"(id = "+retTask.getId()+")" +
                         " добавлены/обновлены. ";
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
-                response.put("id_задачи",retTask.getId());
+                response.put("Id_задачи",retTask.getId());
+                response.put("Состояние",TaskState);
 
                 return ResponseEntity.ok(response);
 
@@ -448,40 +532,33 @@ public class UserRestControllerV1 {
                 newTaskDto.setSource_file_name(taskService.getTaskById(taskId).getSource_file_name());
                 newTaskDto.setStatus(taskService.getTaskById(taskId).getStatus());
 
-                if(taskId==null){
-                    taskService.updateTaskFilesById(newTaskDto,UserId);
-                }
-                else{
-                    taskService.updateTaskFilesById(newTaskDto,UserId);
-                }
+                String oldSourceFileName = taskService.getTaskById(taskId).getSource_file_name();
+                TaskStatusEnum TaskState = null;
+
+                taskService.updateTaskFilesById(newTaskDto,UserId);
 
 
                 Task retTask = taskService.getTaskById(taskId);
 
-                retTask = taskService.getTaskById(taskId);
-                retTask = taskService.getTaskById(taskId);
-                retTask = taskService.getTaskById(taskId);
-                retTask = taskService.getTaskById(taskId);
 
-
-
-                if (retTask.getSource_file_name()!=null&&retTask.getData_file_name()!=null){
+                if (oldSourceFileName != null){
                     newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
+                    TaskState = TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА;
                 }
-                else if(retTask.getSource_file_name()==null&&retTask.getData_file_name()!=null){
+                else {
                     newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ);
-                }
-                else if  (retTask.getSource_file_name()!=null&&retTask.getData_file_name()==null){
-                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ);
+                    TaskState = TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ;
                 }
 
+                taskService.updateTaskStatus(newTaskDto,UserId);
 
                 String msg = "Данные к задаче "+ retTask.getName()+"(id = "+retTask.getId()+")" +
                         " добавлены/обновлены. ";
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
-                response.put("id_задачи",retTask.getId());
+                response.put("Id_задачи",retTask.getId());
+                response.put("Состояние",TaskState);
 
                 return ResponseEntity.ok(response);
             }
@@ -490,7 +567,7 @@ public class UserRestControllerV1 {
                 Map<Object,Object> response = new HashMap<>();
                 response.put("Описание","Нет исходников и/или данных");
 
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
 
         }
@@ -498,7 +575,7 @@ public class UserRestControllerV1 {
             Map<Object,Object> response = new HashMap<>();
             response.put("Описание",e.getMessage());
 
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
 
     }
@@ -543,7 +620,7 @@ public class UserRestControllerV1 {
                 Map<Object,Object> response = new HashMap<>();
                 response.put("Описание","Пустое имя");
 
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
 
             if(TaskSourcesFile != null && TaskDataFile!=null&&
@@ -558,7 +635,8 @@ public class UserRestControllerV1 {
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
-                response.put("id_задачи",task.getId());
+                response.put("Id_задачи",task.getId());
+                response.put("Состояние",TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
 
                 return ResponseEntity.ok(response);
 
@@ -575,7 +653,8 @@ public class UserRestControllerV1 {
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
-                response.put("id_задачи",task.getId());
+                response.put("Id_задачи",task.getId());
+                response.put("Состояние",TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ);
 
                 return ResponseEntity.ok(response);
             }
@@ -591,7 +670,8 @@ public class UserRestControllerV1 {
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
-                response.put("id_задачи",task.getId());
+                response.put("Id_задачи",task.getId());
+                response.put("Состояние",TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ);
 
                 return ResponseEntity.ok(response);
             }
@@ -602,7 +682,7 @@ public class UserRestControllerV1 {
                 Map<Object,Object> response = new HashMap<>();
                 response.put("Описание","Нет исходников и/или данных");
 
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
 
         }
@@ -610,7 +690,7 @@ public class UserRestControllerV1 {
             Map<Object,Object> response = new HashMap<>();
             response.put("Описание",exc.getMessage());
 
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
         catch (Exception exception){
             throw new Exception(exception);

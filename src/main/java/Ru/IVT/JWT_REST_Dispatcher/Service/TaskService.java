@@ -16,6 +16,8 @@ public interface TaskService {
 
     Task getTaskById(Long taskId) throws Exception;
 
+    Task getTaskById(Long taskId, Long UserId) throws Exception;
+
     Task getTaskByName(String taskName) throws Exception;
 
     TaskStatusEnum getStatusById(Long taskId) throws Exception;
@@ -33,4 +35,5 @@ public interface TaskService {
     void updateTaskStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
 
     List<Task> getUserTasks(Long UserId);
+
 }
