@@ -1,0 +1,2 @@
+При обновлении задачи статус не меняется с первого раза из-за того, что в getResponseEntityUpdateTask в методе taskService.getTaskById(newTaskDto.getId());
+один из файлов возращается null хотя по фатку в БД  оба файла сохранены. Почему???

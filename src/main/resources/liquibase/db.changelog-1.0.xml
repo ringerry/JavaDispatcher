@@ -225,5 +225,13 @@
     </changeSet>
 
 
+    <changeSet id="1.0.15" author="МеньшиковАртём">
+
+        <sql>ALTER TABLE task ALTER COLUMN source_file_name DROP NOT NULL;</sql>
+
+
+    </changeSet>
+
+
 
 </databaseChangeLog>

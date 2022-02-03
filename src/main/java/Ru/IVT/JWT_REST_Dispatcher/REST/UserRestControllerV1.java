@@ -5,6 +5,7 @@ import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.User;
 import Ru.IVT.JWT_REST_Dispatcher.Security.Jwt.JwtTokenProvider;
+import Ru.IVT.JWT_REST_Dispatcher.Service.TaskDoesNotExistException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskLimitException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Service.UserService;
@@ -20,6 +21,7 @@ import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -60,38 +62,103 @@ public class UserRestControllerV1 {
     public ResponseEntity
         addTask(@RequestHeader("Authorization") String token,
                 @RequestParam(value = "TaskName") String TaskName,
-                @RequestParam(value = "TaskId", required = false) Long TaskId,
                 @RequestParam(value = "CanNameDuplicate") boolean CanNameDuplicate,
                 @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile,
-                @RequestParam("TaskDatfFile")MultipartFile TaskDataFile) throws Exception {
+                @RequestParam("TaskDataFile")MultipartFile TaskDataFile) throws Exception {
 
 
-            // Проверка на повторяющиеся задачи
         try{
             User User1 = getUserByToken(token);
             UserDto UserDto1 = new UserDto();
             UserDto1.setId(User1.getId());
 
-            if (TaskId==null){
-                if (taskService.taskExist(UserDto1, TaskName)){
-
-                    if(CanNameDuplicate){
-                        // Обновить сущ
-                        return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile, TaskDataFile);
-                    }
-                    else{
-                        // Новая задача
-                        return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, TaskDataFile);
-                    }
-                }
-                else{
-                    // Новая задача
+            if(CanNameDuplicate){
+                return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, TaskDataFile);
+            }
+            else{
+                // Проверка на повторяющиеся задачи
+                if(!taskService.taskExist(UserDto1, TaskName)){
                     return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, TaskDataFile);
                 }
+                else {
+                    String msg = "Задача "+ TaskName +" Уже существует. " +
+                            " Имя задачи должно быть уникальным";
+                    Map<Object,Object> response = new HashMap<>();
+
+                    response.put("Описание",msg);
+//                response.put("id_задачи",task.getId());
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+                }
+            }
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+    @PostMapping(value = "add_sources",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    addSources(@RequestHeader("Authorization") String token,
+               @RequestParam(value = "TaskName") String TaskName,
+               @RequestParam(value = "TaskId",required = false) Long TaskId,
+               @RequestParam(value = "CanNameDuplicate") boolean CanNameDuplicate,
+               @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+
+            User User1 = getUserByToken(token);
+            UserDto UserDto1 = new UserDto();
+            UserDto1.setId(User1.getId());
+
+//            if(CanNameDuplicate){
+//                return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, null);
+//            }
+//            else{
+//                // Проверка на повторяющиеся задачи
+//                if(!taskService.taskExist(UserDto1, TaskName)){
+//                    return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, null);
+//                }
+//                else {
+//                    String msg = "Задача "+ TaskName +" Уже существует. " +
+//                            " Имя задачи должно быть уникальным";
+//                    Map<Object,Object> response = new HashMap<>();
+//
+//                    response.put("Описание",msg);
+////                response.put("id_задачи",task.getId());
+//                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+//                }
+//            }
+
+            if (TaskId==null){
+
+                // Новые исходники
+                if(CanNameDuplicate){
+                    return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, null);
+                }
+                else{
+                    // Проверка на повторяющиеся задачи
+                    if(!taskService.taskExist(UserDto1, TaskName)){
+                        return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, null);
+                    }
+                    else {
+                        String msg = "Задача "+ TaskName +" Уже существует. " +
+                                " Имя задачи должно быть уникальным";
+                        Map<Object,Object> response = new HashMap<>();
+
+                        response.put("Описание",msg);
+        //                response.put("id_задачи",task.getId());
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+                    }
+                }
+
             }
             else{
                 // Обновить существующую задачу
-                return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile, TaskDataFile);
+                return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile,
+                        null,User1.getId());
             }
 
 //            ResponseEntity<Map<Object, Object>> FORBIDDEN = checkDuplicationTasks(token, TaskName);
@@ -101,43 +168,217 @@ public class UserRestControllerV1 {
             throw exc;
         }
 
+    }
+
+    @PostMapping(value = "add_data",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    addData(@RequestHeader("Authorization") String token,
+            @RequestParam(value = "TaskName") String TaskName,
+            @RequestParam(value = "TaskId",required = false) Long TaskId,
+            @RequestParam(value = "CanNameDuplicate") boolean CanNameDuplicate,
+            @RequestParam("TaskDataFile")MultipartFile TaskDataFile) throws Exception {
 
 
+        // Проверка на повторяющиеся задачи
+        try{
+
+            User User1 = getUserByToken(token);
+            UserDto UserDto1 = new UserDto();
+            UserDto1.setId(User1.getId());
+//
+//            if(CanNameDuplicate){
+//                return getResponseEntityNewTask(token, TaskName, null, TaskDataFile);
+//            }
+//            else{
+//                // Проверка на повторяющиеся задачи
+//                if(!taskService.taskExist(UserDto1, TaskName)){
+//                    return getResponseEntityNewTask(token, TaskName, null, TaskDataFile);
+//                }
+//                else {
+//                    String msg = "Задача "+ TaskName +" Уже существует. " +
+//                            " Имя задачи должно быть уникальным";
+//                    Map<Object,Object> response = new HashMap<>();
+//
+//                    response.put("Описание",msg);
+////                response.put("id_задачи",task.getId());
+//                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+//                }
+//            }
+//
+
+            if (TaskId==null){
+
+                // Новые исходники
+                if(CanNameDuplicate){
+                    return getResponseEntityNewTask(token, TaskName, null, TaskDataFile);
+                }
+                else{
+                    // Проверка на повторяющиеся задачи
+                    if(!taskService.taskExist(UserDto1, TaskName)){
+                        return getResponseEntityNewTask(token, TaskName, null, TaskDataFile);
+                    }
+                    else {
+                        String msg = "Задача "+ TaskName +" Уже существует. " +
+                                " Имя задачи должно быть уникальным";
+                        Map<Object,Object> response = new HashMap<>();
+
+                        response.put("Описание",msg);
+                        //                response.put("id_задачи",task.getId());
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+                    }
+                }
+
+            }
+            else{
+                // Обновить существующую задачу
+
+                return getResponseEntityUpdateTask(token, TaskName,TaskId, null,
+                        TaskDataFile,User1.getId());
+
+
+            }
+
+        }
+        catch (Exception exc){
+            throw exc;
+        }
 
     }
+
+
+
+    @PostMapping(value = "update_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    updateTask(@RequestHeader("Authorization") String token,
+            @RequestParam(value = "TaskName") String TaskName,
+            @RequestParam(value = "TaskId") Long TaskId,
+            @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile,
+            @RequestParam("TaskDataFile")MultipartFile TaskDataFile) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+
+            User User1 = getUserByToken(token);
+
+            return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile, TaskDataFile,User1.getId());
+
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+
+    @PostMapping(value = "update_sources",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    updateSources(@RequestHeader("Authorization") String token,
+               @RequestParam(value = "TaskName") String TaskName,
+               @RequestParam(value = "TaskId") Long TaskId,
+               @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+            User User1 = getUserByToken(token);
+            return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile, null, User1.getId());
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+    @PostMapping(value = "update_data",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    updateData(@RequestHeader("Authorization") String token,
+                  @RequestParam(value = "TaskName") String TaskName,
+                  @RequestParam(value = "TaskId") Long TaskId,
+                  @RequestParam("TaskDataFile")MultipartFile TaskDataFile) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+            User User1 = getUserByToken(token);
+            return getResponseEntityUpdateTask(token, TaskName,TaskId, null, TaskDataFile, User1.getId());
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+    @PostMapping(value = "task_list",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    taskList(@RequestHeader("Authorization") String token) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+            User User1 = getUserByToken(token);
+
+            List<Task> taskList = taskService.getUserTasks(User1.getId());
+
+            String msg = "Список всех задач ";
+            Map<Object,Object> response = new HashMap<>();
+
+            response.put("Описание",msg);
+            response.put("Задачи",taskList);
+//                response.put("id_задачи",task.getId());
+
+            return ResponseEntity.ok(response);
+
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
 
     private ResponseEntity getResponseEntityUpdateTask(String token,
                                                        String taskName,
                                                        Long taskId,
                                                        MultipartFile taskSourcesFile,
-                                                       MultipartFile taskDataFile) throws Exception {
+                                                       MultipartFile taskDataFile, Long UserId) throws Exception {
 
         try{
-            if(!taskSourcesFile.isEmpty()&& !taskDataFile.isEmpty()){
-                File uploadDir = new File(taskUploadPath);
-                if (!uploadDir.exists()){
-                    uploadDir.mkdir();
-                }
 
-                NewTaskDto newTaskDto = new NewTaskDto();
-                newTaskDto.setTask_name(taskName);
-                newTaskDto.setId(taskId);
-                newTaskDto.setUser_id(getUserByToken(token).getId());
-                newTaskDto.setData_file_name(getWholeFilePath(taskDataFile));
-                newTaskDto.setSource_file_name(getWholeFilePath(taskSourcesFile));
+            createFolderIfNotExist(taskUploadPath);
 
+            if (taskId==null){
+                // Оба файла пуcты
+                Map<Object,Object> response = new HashMap<>();
+                response.put("Описание","Пустой id");
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            }
+
+
+            User User1 = getUserByToken(token);
+            UserDto UserDto1 = new UserDto();
+            UserDto1.setId(User1.getId());
+
+            if((taskSourcesFile != null && taskDataFile!=null)&&
+                    (!taskSourcesFile.isEmpty()&&!taskDataFile.isEmpty())){
+
+                NewTaskDto newTaskDto = getNewTaskDto(token, taskName, taskId, taskSourcesFile, taskDataFile);
+                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
 
                 // Добавить в очередь, диспетчер сам просканирует, что выполнять
-                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
-//                Task task = null;
+//                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
+
                 if(taskId==null){
-                    taskService.updateTaskByName(newTaskDto);
+                    taskService.updateTaskFilesById(newTaskDto,UserId);
                 }
                 else{
-                    taskService.updateTaskById(newTaskDto);
+                    taskService.updateTaskFilesById(newTaskDto,UserId);
                 }
 
-                String msg = "Задача "+ taskName +" обновлена. ";
+                Task task = taskService.getTaskById(newTaskDto.getId());
+
+                String msg = "Задача "+ task.getName()+"(id = "+task.getId()+")" +" обновлена. ";
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
@@ -146,44 +387,172 @@ public class UserRestControllerV1 {
                 return ResponseEntity.ok(response);
 
             }
-            else{
+            else if(taskSourcesFile != null && taskDataFile==null&&
+                    (!taskSourcesFile.isEmpty()))
+            {
+                // Обновить исходники
+                NewTaskDto newTaskDto = getNewTaskDto(token, taskName, taskId, taskSourcesFile, taskDataFile);
 
+
+                // Добавить в очередь, диспетчер сам просканирует, что выполнять
+
+
+                newTaskDto.setData_file_name(taskService.getTaskById(taskId).getData_file_name());
+                newTaskDto.setStatus(taskService.getTaskById(taskId).getStatus());
+
+                if(taskId==null){
+                    taskService.updateTaskFilesById(newTaskDto,UserId);
+                }
+                else{
+                    taskService.updateTaskFilesById(newTaskDto,UserId);
+                }
+
+                Task retTask = taskService.getTaskById(taskId);
+                if (retTask.getSource_file_name()!=null&&retTask.getData_file_name()!=null){
+                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
+                }
+                else if(retTask.getSource_file_name()==null&&retTask.getData_file_name()!=null){
+                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ);
+                }
+                else if  (retTask.getSource_file_name()!=null&&retTask.getData_file_name()==null){
+                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ);
+                }
+
+                taskService.updateTaskStatus(newTaskDto,UserId);
+
+
+//                // Состояние смена
+//                if (taskService.getTaskByName(taskName).getStatus()==TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ){}
+//                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
+
+                String msg = "Исходники к задаче "+ retTask.getName()+"(id = "+retTask.getId()+")" +
+                        " добавлены/обновлены. ";
+                Map<Object,Object> response = new HashMap<>();
+
+                response.put("Описание",msg);
+                response.put("id_задачи",retTask.getId());
+
+                return ResponseEntity.ok(response);
+
+            }
+            else if (taskSourcesFile == null && taskDataFile!=null&&
+                    (!taskDataFile.isEmpty())){
+                //Обновить данные
+
+                NewTaskDto newTaskDto = getNewTaskDto(token, taskName, taskId, taskSourcesFile, taskDataFile);
+                // Добавить в очередь, диспетчер сам просканирует, что выполнять
+
+
+                newTaskDto.setSource_file_name(taskService.getTaskById(taskId).getSource_file_name());
+                newTaskDto.setStatus(taskService.getTaskById(taskId).getStatus());
+
+                if(taskId==null){
+                    taskService.updateTaskFilesById(newTaskDto,UserId);
+                }
+                else{
+                    taskService.updateTaskFilesById(newTaskDto,UserId);
+                }
+
+
+                Task retTask = taskService.getTaskById(taskId);
+
+                retTask = taskService.getTaskById(taskId);
+                retTask = taskService.getTaskById(taskId);
+                retTask = taskService.getTaskById(taskId);
+                retTask = taskService.getTaskById(taskId);
+
+
+
+                if (retTask.getSource_file_name()!=null&&retTask.getData_file_name()!=null){
+                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
+                }
+                else if(retTask.getSource_file_name()==null&&retTask.getData_file_name()!=null){
+                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ);
+                }
+                else if  (retTask.getSource_file_name()!=null&&retTask.getData_file_name()==null){
+                    newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ);
+                }
+
+
+                String msg = "Данные к задаче "+ retTask.getName()+"(id = "+retTask.getId()+")" +
+                        " добавлены/обновлены. ";
+                Map<Object,Object> response = new HashMap<>();
+
+                response.put("Описание",msg);
+                response.put("id_задачи",retTask.getId());
+
+                return ResponseEntity.ok(response);
+            }
+            else{
+                // Оба файла пуcты
                 Map<Object,Object> response = new HashMap<>();
                 response.put("Описание","Нет исходников и/или данных");
 
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
             }
 
-        } catch (Exception exception){
-            throw exception;
         }
+        catch (TaskDoesNotExistException e){
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+
     }
 
+    private NewTaskDto getNewTaskDto(String token, String taskName, Long taskId, MultipartFile taskSourcesFile, MultipartFile taskDataFile) throws IOException {
+        NewTaskDto newTaskDto = new NewTaskDto();
+        newTaskDto.setTask_name(taskName);
+        newTaskDto.setId(taskId);
+        newTaskDto.setUser_id(getUserByToken(token).getId());
+        newTaskDto.setData_file_name(getWholeFilePath(taskDataFile));
+        newTaskDto.setSource_file_name(getWholeFilePath(taskSourcesFile));
+        return newTaskDto;
+    }
+
+    private NewTaskDto getNewTaskDtoName(String token, String taskName, MultipartFile taskSourcesFile, MultipartFile taskDataFile) throws IOException {
+        NewTaskDto newTaskDto = new NewTaskDto();
+        newTaskDto.setTask_name(taskName);
+        newTaskDto.setUser_id(getUserByToken(token).getId());
+        newTaskDto.setData_file_name(getWholeFilePath(taskDataFile));
+        newTaskDto.setSource_file_name(getWholeFilePath(taskSourcesFile));
+        return newTaskDto;
+    }
+
+
+    private static void createFolderIfNotExist(String taskUploadPath) {
+        File uploadDir = new File(taskUploadPath);
+        if (!uploadDir.exists()){
+            uploadDir.mkdir();
+        }
+    }
 
     private ResponseEntity getResponseEntityNewTask(String token,
                                                     String TaskName,
                                                     MultipartFile TaskSourcesFile,
                                                     MultipartFile TaskDataFile) throws Exception {
         try{
-            if(!TaskSourcesFile.isEmpty()&& !TaskDataFile.isEmpty()){
-                File uploadDir = new File(taskUploadPath);
-                if (!uploadDir.exists()){
-                    uploadDir.mkdir();
-                }
 
-                NewTaskDto newTaskDto = new NewTaskDto();
-                newTaskDto.setTask_name(TaskName);
-                newTaskDto.setUser_id(getUserByToken(token).getId());
-                newTaskDto.setData_file_name(getWholeFilePath(TaskDataFile));
-                newTaskDto.setSource_file_name(getWholeFilePath(TaskSourcesFile));
+            createFolderIfNotExist(taskUploadPath);
 
+            if (TaskName==null||TaskName.isEmpty()){
+                // Оба файла пуcты
+                Map<Object,Object> response = new HashMap<>();
+                response.put("Описание","Пустое имя");
 
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            }
+
+            if(TaskSourcesFile != null && TaskDataFile!=null&&
+                    (!TaskSourcesFile.isEmpty()&&!TaskDataFile.isEmpty())){
+
+                NewTaskDto newTaskDto = getNewTaskDtoName(token, TaskName, TaskSourcesFile, TaskDataFile);
                 // Добавить в очередь, диспетчер сам просканирует, что выполнять
                 newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
                 Task task = taskService.saveTask(newTaskDto);
 
-                String msg = "Задача "+ TaskName +" добавлена в обработку. " +
-                        "Имя файла:"+ TaskSourcesFile.getOriginalFilename()+".";
+                String msg = "Задача "+ TaskName +" загружены на сервер. ";
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
@@ -192,64 +561,41 @@ public class UserRestControllerV1 {
                 return ResponseEntity.ok(response);
 
             }
-            else{
+            else if(TaskSourcesFile != null && TaskDataFile==null&&
+                    (!TaskSourcesFile.isEmpty())){
 
-                Map<Object,Object> response = new HashMap<>();
-                response.put("Описание","Нет исходников и/или данных");
-
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-            }
-
-        }
-        catch (TaskLimitException exc){
-            Map<Object,Object> response = new HashMap<>();
-            response.put("Описание",exc.getMessage());
-
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-        }
-        catch (Exception exception){
-            throw new Exception(exception);
-        }
-    }
-
-
-    @PostMapping(value = "add_sources",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity
-    addSources(@RequestHeader("Authorization") String token,
-               @RequestParam("TaskName") String TaskName,
-               @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile) throws Exception {
-
-        try{
-
-
-            if(!TaskSourcesFile.isEmpty()){
-                File uploadDir = new File(taskUploadPath);
-                if (!uploadDir.exists()){
-                    uploadDir.mkdir();
-                }
-
-                NewTaskDto newTaskDto = new NewTaskDto();
-                newTaskDto.setTask_name(TaskName);
-                newTaskDto.setUser_id(getUserByToken(token).getId());
-//                newTaskDto.setData_file_name(getWholeFilePath(TaskDataFile));
-                newTaskDto.setSource_file_name(getWholeFilePath(TaskSourcesFile));
-
-
-                // Добавить в очередь, диспетчер сам просканирует, что выполнять
-                newTaskDto.setStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
+                // Новые исходники
+                NewTaskDto newTaskDto = getNewTaskDtoName(token, TaskName, TaskSourcesFile, TaskDataFile);
+                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ);
                 Task task = taskService.saveTask(newTaskDto);
 
-                String msg = "Задача "+ TaskName+" добавлена в обработку. " +
-                        "Имя файла:"+ TaskSourcesFile.getOriginalFilename()+".";
+                String msg = "Исходники к задаче "+ TaskName +" загружены на сервер. ";
                 Map<Object,Object> response = new HashMap<>();
 
                 response.put("Описание",msg);
                 response.put("id_задачи",task.getId());
 
                 return ResponseEntity.ok(response);
-
             }
-            else{
+            else if (TaskSourcesFile == null && TaskDataFile!=null&&
+                    (!TaskDataFile.isEmpty())){
+
+                // Новые данные
+                NewTaskDto newTaskDto = getNewTaskDtoName(token, TaskName, TaskSourcesFile, TaskDataFile);
+                newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ);
+                Task task = taskService.saveTask(newTaskDto);
+
+                String msg = "Данные к задаче "+ TaskName +" загружены на сервер. ";
+                Map<Object,Object> response = new HashMap<>();
+
+                response.put("Описание",msg);
+                response.put("id_задачи",task.getId());
+
+                return ResponseEntity.ok(response);
+            }
+            else
+            {
+                // Пустые файлы
 
                 Map<Object,Object> response = new HashMap<>();
                 response.put("Описание","Нет исходников и/или данных");
@@ -267,24 +613,8 @@ public class UserRestControllerV1 {
         catch (Exception exception){
             throw new Exception(exception);
         }
-
-
     }
 
-//    private ResponseEntity<Map<Object, Object>> checkDuplicationTasks(String token, String TaskName) {
-//        User User1 = getUserByToken(token);
-//        UserDto UserDto1 = new UserDto();
-//        UserDto1.setId(User1.getId());
-//
-//        if (taskService.taskExist(UserDto1, TaskName)){
-//            Map<Object,Object> response = new HashMap<>();
-//            response.put("Описание","Задача "+ TaskName +" уже существует. В пределах пользователя имя задачи " +
-//                    "должно быть уникальным.");
-//
-//            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-//        }
-//        return null;
-//    }
 
     private User getUserByToken(String token) {
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider();
@@ -294,12 +624,17 @@ public class UserRestControllerV1 {
         return User1;
     }
 
-    private String getWholeFilePath(MultipartFile TaskSourcesFile) throws IOException {
-        String [] fileParts = TaskSourcesFile.getOriginalFilename().split("[.]");
+    private String getWholeFilePath(MultipartFile TaskFile) throws IOException {
+
+        if(TaskFile==null){
+            return null;
+        }
+
+        String [] fileParts = TaskFile.getOriginalFilename().split("[.]");
         String uniqFileName = UUID.randomUUID().toString();
         String resFileName =  fileParts[0]+"."+ uniqFileName+"."+fileParts[1];
         String sourceFileAllPath = taskUploadPath +"\\"+ resFileName;
-        TaskSourcesFile.transferTo(new File(sourceFileAllPath));
+        TaskFile.transferTo(new File(sourceFileAllPath));
         return sourceFileAllPath;
     }
 

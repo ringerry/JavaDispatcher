@@ -3,9 +3,13 @@ package Ru.IVT.JWT_REST_Dispatcher.Service.Impl;
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
 import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Constanta;
+import Ru.IVT.JWT_REST_Dispatcher.Model.Role;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
+import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepository;
+import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepositoryNonTransactional;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.UserRepository;
+import Ru.IVT.JWT_REST_Dispatcher.Service.TaskDoesNotExistException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskLimitException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 
 @Service
@@ -21,14 +26,16 @@ import java.util.Date;
 public class TaskServiceImpl implements TaskService {
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
+    private final TaskRepositoryNonTransactional taskRepositoryNonTransactional;
 //    private final JwtTokenProvider jwtTokenProvider;
 
     @Autowired
-    public TaskServiceImpl(UserRepository userRepository, TaskRepository taskRepository/*,
-                           JwtTokenProvider jwtTokenProvider*/) {
+    public TaskServiceImpl(UserRepository userRepository, TaskRepository taskRepository,/*,
+                           JwtTokenProvider jwtTokenProvider*/TaskRepositoryNonTransactional taskRepositoryNonTransactional) {
         this.userRepository = userRepository;
         this.taskRepository = taskRepository;
 //        this.jwtTokenProvider = jwtTokenProvider;
+        this.taskRepositoryNonTransactional = taskRepositoryNonTransactional;
     }
 
     private boolean isReachAddTaskLimit(Long userId/*,String token*/) {
@@ -39,7 +46,7 @@ public class TaskServiceImpl implements TaskService {
         Date now = new Date();
         Date hour_before = new Date(now.getTime() - Constanta.taskWindowLimitInMilliseconds);
 
-        if(taskRepository.countUserTasksBetween2Dates(userId,hour_before,now)<Constanta.maxLimitTaskAtTokenTime)
+        if(taskRepositoryNonTransactional.countUserTasksBetween2Dates(userId,hour_before,now)<Constanta.maxLimitTaskAtTokenTime)
             return true;
         else   return  false;
 
@@ -54,18 +61,33 @@ public class TaskServiceImpl implements TaskService {
             Task newTask = new Task();
             newTask.setName(newTaskDto.getTask_name());
             newTask.setStatus(newTaskDto.getStatus());
-            newTask.setSource_file_name(newTaskDto.getData_file_name());
-            newTask.setData_file_name(newTaskDto.getSource_file_name());
+            newTask.setSource_file_name(newTaskDto.getSource_file_name());
+            newTask.setData_file_name(newTaskDto.getData_file_name());
             newTask.setUser_id(newTaskDto.getUser_id());
             newTask.setCreated(new Date());
             newTask.setUpdated(new Date());
 
-            if(this.isReachAddTaskLimit(newTaskDto.getUser_id()))
+
+
+//            ArrayList<Role> = userRepository.getUserById(newTaskDto.getUser_id()).getRoles();
+            List<Role> rolesList =  userRepository.getUserById(newTaskDto.getUser_id()).getRoles();
+
+            boolean Admin = false;
+            for (Role role: rolesList) {
+                if(role.toString().indexOf("ADMIN")!=-1) Admin = true;
+            }
+
+            if(Admin){
                 return taskRepository.save(newTask);
-            else{
-                throw new TaskLimitException("Превышено максимальное количество задач за время сессии." +
-                        " Разрешено загружать "+Constanta.maxLimitTaskAtTokenTime.toString()+" задач(-и,-у)" +
-                        " за "+Constanta.taskWindowLimitInMilliseconds/60000+" минут.");
+            }
+            else {
+                if(this.isReachAddTaskLimit(newTaskDto.getUser_id()))
+                    return taskRepository.save(newTask);
+                else{
+                    throw new TaskLimitException("Превышено максимальное количество задач за время сессии." +
+                            " Разрешено загружать "+Constanta.maxLimitTaskAtTokenTime.toString()+" задач(-и,-у)" +
+                            " за "+Constanta.taskWindowLimitInMilliseconds/60000+" минут.");
+                }
             }
 //            return true;
         }
@@ -84,7 +106,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public boolean taskExist(UserDto userDto1, Long taskId) {
 
-        ArrayList<Task> tasks = taskRepository.getUserTasks(userDto1.getId());
+        ArrayList<Task> tasks = taskRepositoryNonTransactional.getUserTasks(userDto1.getId());
         for (Task task:
              tasks) {
             if (taskId==task.getId()) return true;
@@ -104,7 +126,7 @@ public class TaskServiceImpl implements TaskService {
 //
 //        taskRepository.test();
 
-        ArrayList<Task> tasks = taskRepository.getUserTasks(userDto1.getId());
+        ArrayList<Task> tasks = taskRepositoryNonTransactional.getUserTasks(userDto1.getId());
         for (Task task:
                 tasks) {
             if (taskName.equals(taskName)) return true;
@@ -115,7 +137,7 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public Task getTaskById(Long taskId) throws Exception {
-        Task task = taskRepository.getTaskById(taskId);
+        Task task = taskRepositoryNonTransactional.getTaskById(taskId);
 
         if (task!=null){
             return task;
@@ -124,11 +146,44 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public void updateTaskByName(NewTaskDto newTaskDto) {
-        try{
-             taskRepository.updateTaskByName(newTaskDto.getTask_name(),
-                    newTaskDto.getData_file_name(),newTaskDto.getSource_file_name());
+    public Task getTaskByName(String taskName) throws Exception {
+        Task task = taskRepositoryNonTransactional.getTaskByName(taskName);
 
+        if (task!=null){
+            return task;
+        }
+        else {throw new Exception("Задачи "+taskName+" не существует");}
+    }
+
+    @Override
+    public TaskStatusEnum getStatusById(Long taskId) throws Exception {
+
+        try{return taskRepositoryNonTransactional.getTaskById(taskId).getStatus();}
+        catch (Exception e){throw e;}
+
+
+    }
+
+    @Override
+    public TaskStatusEnum getStatusByName(String taskName) throws Exception {
+        try{return taskRepositoryNonTransactional.getTaskByName(taskName).getStatus();}
+        catch (Exception e){throw e;}
+    }
+
+    @Override
+    public Task updateTaskFilesByName(NewTaskDto newTaskDto, Long UserId) throws Exception {
+        try{
+
+            if (isUserHaveTask(newTaskDto, UserId)){
+                taskRepository.updateTaskByName(newTaskDto.getTask_name(),
+                        newTaskDto.getData_file_name(),newTaskDto.getSource_file_name(),UserId);
+                return taskRepositoryNonTransactional.getTaskByName(newTaskDto.getTask_name());
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getTask_name()+" не существует");}
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
         }
         catch (Exception e){
             throw e;
@@ -136,16 +191,148 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public void updateTaskById(NewTaskDto newTaskDto) {
+    public Task updateTaskSourceFileByName(NewTaskDto newTaskDto, Long UserId) throws Exception {
         try{
-            taskRepository.updateTaskById(newTaskDto.getId(),
-                    newTaskDto.getData_file_name(),newTaskDto.getSource_file_name());
 
+
+            if (isUserHaveTask(newTaskDto, UserId)){
+                taskRepository.updateTaskSourceFileByName(newTaskDto.getTask_name(),
+                        newTaskDto.getSource_file_name(),UserId);
+                return taskRepositoryNonTransactional.getTaskByName(newTaskDto.getTask_name());
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getTask_name()+" не существует");}
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public Task updateTaskDataFileByName(NewTaskDto newTaskDto, Long UserId) throws Exception {
+        try{
+
+            if (isUserHaveTask(newTaskDto, UserId)){
+                taskRepository.updateTaskDataFileByName(newTaskDto.getTask_name(),
+                        newTaskDto.getData_file_name(),UserId);
+                return taskRepositoryNonTransactional.getTaskByName(newTaskDto.getTask_name());
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getTask_name()+" не существует");}
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public Task updateTaskSourceFileById(NewTaskDto newTaskDto, Long UserId) throws Exception {
+        try{
+
+            if (isUserHaveTask(newTaskDto, UserId)){
+                taskRepository.updateTaskSourceFileById(newTaskDto.getId(), newTaskDto.getSource_file_name(),UserId);
+                return taskRepositoryNonTransactional.getTaskById(newTaskDto.getId());
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public Task updateTaskDataFileById(NewTaskDto newTaskDto, Long UserId) throws Exception,TaskDoesNotExistException {
+        try{
+
+            if (isUserHaveTask(newTaskDto, UserId)){
+                taskRepository.updateTaskDataFileById(newTaskDto.getId(), newTaskDto.getData_file_name(), UserId);
+                return taskRepositoryNonTransactional.getTaskById(newTaskDto.getId());
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public void updateTaskFilesById(NewTaskDto newTaskDto, Long UserId) throws Exception {
+        try{
+
+            if (isUserHaveTask(newTaskDto, UserId)){
+                taskRepository.updateTaskById(newTaskDto.getId(),
+                        newTaskDto.getData_file_name(),newTaskDto.getSource_file_name(),
+                        newTaskDto.getStatus(),UserId);
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
         }
         catch (Exception e){
             throw e;
         }
 
+    }
+
+    @Override
+    public void updateTaskStatus(NewTaskDto newTaskDto, Long UserId) throws Exception {
+        try{
+
+            if (isUserHaveTask(newTaskDto, UserId)){
+                taskRepository.updateTaskStatusById(newTaskDto.getId(),newTaskDto.getStatus(),UserId);
+//                taskRepository.updateTaskStatusById(newTaskDto.getId(),newTaskDto.getStatus(),UserId);
+
+//                while(taskRepository.getTaskStatusById(newTaskDto.getId(),UserId)!=newTaskDto.getStatus()){
+//                    taskRepository.updateTaskStatusById(newTaskDto.getId(),newTaskDto.getStatus(),UserId);
+//                }
+
+//                return taskRepository.getTaskById(newTaskDto.getId());
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public List<Task> getUserTasks(Long UserId) {
+        return taskRepositoryNonTransactional.getUserTasks(UserId);
+    }
+
+    private boolean isUserHaveTask(NewTaskDto newTaskDto, Long userId) {
+        boolean UserHaveTask = false;
+//        taskRepositoryNonTransactional.u
+        ArrayList<Task> tasks = taskRepositoryNonTransactional.getUserTasks(userId);
+        for (Task task: tasks) {
+            if (newTaskDto.getId().equals(task.getId())){
+                UserHaveTask = true;
+                break;
+            }
+        }
+        return UserHaveTask;
     }
 
 }
