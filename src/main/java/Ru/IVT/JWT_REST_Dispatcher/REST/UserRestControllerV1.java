@@ -320,6 +320,8 @@ public class UserRestControllerV1 {
 
             List<Task> taskList = taskService.getUserTasks(User1.getId());
 
+            // подготовка в json
+
             String msg = "Список всех задач ";
             Map<Object,Object> response = new HashMap<>();
 

@@ -1,5 +1,6 @@
 package Ru.IVT.JWT_REST_Dispatcher.Model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -15,37 +16,37 @@ import java.util.List;
 
 public class Task {
 
-//    @ToString.Exclude
+   @ToString.Exclude
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
 
-//    @ToString.Exclude
+    @ToString.Exclude
     @CreatedDate
     @Column(name = "created")
     private Date created;
 
-//    @ToString.Exclude
+    @ToString.Exclude
     @LastModifiedDate
     @Column(name = "updated")
     private Date updated;
 
-//    @ToString.Exclude
+    @ToString.Exclude
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private TaskStatusEnum status;
 
 
-//    @ToString.Exclude
+    @ToString.Exclude
     @Column(name = "name")
     private String name;
 
-//    @ToString.Exclude
+   @ToString.Exclude
     @Column(name = "source_file_name")
     private String source_file_name;
 
-//    @ToString.Exclude
+    @ToString.Exclude
     @Column(name = "data_file_name")
     private String data_file_name;
 
@@ -55,14 +56,15 @@ public class Task {
 //    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
 //    @Column(name = "User_Id")
 
-//    @ToString.Exclude
+    @ToString.Exclude
     private Long user_id;
 
 
-//    @ToString.Exclude
+    @ToString.Exclude
     // одни задача снимается и загружается на выполнение
     @OneToMany(mappedBy = "id")
-    @JsonManagedReference
+//    @JsonManagedReference
+    @JsonIgnore
     protected List<TaskInRun> task_in_runs;
 
 
