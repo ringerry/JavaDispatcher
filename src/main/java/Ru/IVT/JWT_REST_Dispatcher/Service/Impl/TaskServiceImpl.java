@@ -142,7 +142,7 @@ public class TaskServiceImpl implements TaskService {
         if (task!=null){
             return task;
         }
-        else {throw new Exception("Задачи "+taskId+"не существует");}
+        else {throw new TaskDoesNotExistException("Задачи "+taskId+"не существует");}
     }
 
     @Override
@@ -167,11 +167,12 @@ public class TaskServiceImpl implements TaskService {
         if (task!=null){
             return task;
         }
-        else {throw new Exception("Задачи "+taskName+" не существует");}
+        else {throw new TaskDoesNotExistException("Задачи "+taskName+" не существует");}
     }
 
     @Override
     public TaskStatusEnum getStatusById(Long taskId) throws Exception {
+
 
         try{return taskRepositoryNonTransactional.getTaskById(taskId).getStatus();}
         catch (Exception e){throw e;}

@@ -113,25 +113,6 @@ public class UserRestControllerV1 {
             UserDto UserDto1 = new UserDto();
             UserDto1.setId(User1.getId());
 
-//            if(CanNameDuplicate){
-//                return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, null);
-//            }
-//            else{
-//                // Проверка на повторяющиеся задачи
-//                if(!taskService.taskExist(UserDto1, TaskName)){
-//                    return getResponseEntityNewTask(token, TaskName, TaskSourcesFile, null);
-//                }
-//                else {
-//                    String msg = "Задача "+ TaskName +" Уже существует. " +
-//                            " Имя задачи должно быть уникальным";
-//                    Map<Object,Object> response = new HashMap<>();
-//
-//                    response.put("Описание",msg);
-////                response.put("id_задачи",task.getId());
-//                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-//                }
-//            }
-
             if (TaskId==null){
 
                 // Новые исходники
@@ -149,7 +130,7 @@ public class UserRestControllerV1 {
                         Map<Object,Object> response = new HashMap<>();
 
                         response.put("Описание",msg);
-        //                response.put("id_задачи",task.getId());
+
                         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
                     }
                 }
@@ -157,17 +138,53 @@ public class UserRestControllerV1 {
             }
             else{
                 // Обновить существующую задачу
-                return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile,
-                        null,User1.getId());
+
+                Task task = taskService.getTaskById(TaskId);
+
+                if (isCanUpdateTask(task)){
+
+                    return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile,
+                            null,User1.getId());
+                }
+                else {
+
+                    String msg = "Изменять исходники разрешено, если задача находится в одном из состояний:"+
+                                 getWhiteTaskUpdateList();
+
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание",msg);
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
+
+
             }
 
-//            ResponseEntity<Map<Object, Object>> FORBIDDEN = checkDuplicationTasks(token, TaskName);
-//            if (FORBIDDEN != null) return FORBIDDEN;
+        }
+        catch (TaskDoesNotExistException e){
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
         catch (Exception exc){
             throw exc;
         }
 
+    }
+
+    private String getWhiteTaskUpdateList() {
+       return TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ+", или "+TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ+", или "+
+                TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА+", или "+TaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ+", или "+
+               TaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ+".";
+    }
+
+    private boolean isCanUpdateTask(Task task) {
+        return task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ ||
+                task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ ||
+                task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА||
+                task.getStatus() == TaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ||
+                task.getStatus() == TaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ;
     }
 
     @PostMapping(value = "add_data",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -185,26 +202,6 @@ public class UserRestControllerV1 {
             User User1 = getUserByToken(token);
             UserDto UserDto1 = new UserDto();
             UserDto1.setId(User1.getId());
-//
-//            if(CanNameDuplicate){
-//                return getResponseEntityNewTask(token, TaskName, null, TaskDataFile);
-//            }
-//            else{
-//                // Проверка на повторяющиеся задачи
-//                if(!taskService.taskExist(UserDto1, TaskName)){
-//                    return getResponseEntityNewTask(token, TaskName, null, TaskDataFile);
-//                }
-//                else {
-//                    String msg = "Задача "+ TaskName +" Уже существует. " +
-//                            " Имя задачи должно быть уникальным";
-//                    Map<Object,Object> response = new HashMap<>();
-//
-//                    response.put("Описание",msg);
-////                response.put("id_задачи",task.getId());
-//                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-//                }
-//            }
-//
 
             if (TaskId==null){
 
@@ -232,8 +229,23 @@ public class UserRestControllerV1 {
             else{
                 // Обновить существующую задачу
 
-                return getResponseEntityUpdateTask(token, TaskName,TaskId, null,
-                        TaskDataFile,User1.getId());
+                Task task = taskService.getTaskById(TaskId);
+
+                if (isCanUpdateTask(task)){
+
+                    return getResponseEntityUpdateTask(token, TaskName,TaskId, null,
+                            TaskDataFile,User1.getId());
+                }
+                else {
+
+                    String msg = "Изменять данные разрешено, если задача находится в одном из состояний:"+
+                            getWhiteTaskUpdateList();
+
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание",msg);
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
 
 
             }
@@ -261,7 +273,24 @@ public class UserRestControllerV1 {
 
             User User1 = getUserByToken(token);
 
-            return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile, TaskDataFile,User1.getId());
+            Task task = taskService.getTaskById(TaskId);
+
+            if (isCanUpdateTask(task)){
+
+                return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile,
+                        TaskDataFile,User1.getId());
+            }
+            else {
+
+                String msg = "Изменять задачу разрешено, если она находится в одном из состояний:"+
+                                getWhiteTaskUpdateList();
+
+                Map<Object,Object> response = new HashMap<>();
+                response.put("Описание",msg);
+
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+
 
         }
         catch (Exception exc){
@@ -407,14 +436,25 @@ public class UserRestControllerV1 {
 
                 return ResponseEntity.ok(response);
             }
+            else if(runTask.getStatus()==TaskStatusEnum.В_ОЧЕРЕДИ){
+                String msg = "Задача уже запущена и находится в очереди на выополнение.";
+
+                Map<Object, Object> response = getBasicResponseBody(runTask, msg);
+
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+            else if(runTask.getStatus()==TaskStatusEnum.ВЫПОЛНЕНИЕ){
+                String msg = "Задача выполняется.";
+
+                Map<Object, Object> response = getBasicResponseBody(runTask, msg);
+
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
             else{
 
-                String msg = "Невозоможно запустить задачу. Отстствуют исходники или данные.";
+                String msg = "Невозоможно запустить задачу. Отстствуют исходники или данные, или ошибка компилятора";
 
-                Map<Object,Object> response = new HashMap<>();
-                response.put("Описание",msg);
-                response.put("Состояние",runTask.getStatus());
-                response.put("Id_задачи",runTask.getId());
+                Map<Object, Object> response = getBasicResponseBody(runTask, msg);
 
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
@@ -432,6 +472,14 @@ public class UserRestControllerV1 {
             throw exc;
         }
 
+    }
+
+    private Map<Object, Object> getBasicResponseBody(Task runTask, String msg) {
+        Map<Object,Object> response = new HashMap<>();
+        response.put("Описание", msg);
+        response.put("Состояние", runTask.getStatus());
+        response.put("Id_задачи", runTask.getId());
+        return response;
     }
 
     private ResponseEntity getResponseEntityUpdateTask(String token,
