@@ -768,7 +768,7 @@ public class UserRestControllerV1 {
         String [] fileParts = TaskFile.getOriginalFilename().split("[.]");
         String uniqFileName = UUID.randomUUID().toString();
         String resFileName =  fileParts[0]+"."+ uniqFileName+"."+fileParts[1];
-        String sourceFileAllPath = taskUploadPath +"\\"+ resFileName;
+        String sourceFileAllPath = taskUploadPath +"/"+ resFileName;
         TaskFile.transferTo(new File(sourceFileAllPath));
         return sourceFileAllPath;
     }
