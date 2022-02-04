@@ -2,6 +2,8 @@ package Ru.IVT.JWT_REST_Dispatcher.REST;
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
 import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
+import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl.DispatcherEngineImpl;
+import Ru.IVT.JWT_REST_Dispatcher.JwtDispatcherApplication;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.User;
 import Ru.IVT.JWT_REST_Dispatcher.Security.Jwt.JwtTokenProvider;
@@ -40,20 +42,24 @@ public class UserRestControllerV1 {
 
     private final UserService userService;
     private final TaskService taskService;
+    private DispatcherEngineImpl dispathcerEnginge;
 //    private final DispathcerProvider dispathcerProvider;
 
     @Value("${local.paths.save.taskSources}")
     private String taskUploadPath;
 
     @Autowired
-    public UserRestControllerV1(UserService userService, TaskService taskService/*, DispathcerProvider dispathcerProvider*/) {
+    public UserRestControllerV1(UserService userService, TaskService taskService) {
         this.userService = userService;
         this.taskService = taskService;
 //        this.dispathcerProvider = dispathcerProvider;
+        this.dispathcerEnginge = JwtDispatcherApplication.getDispatcherEngine();
     }
 
     @GetMapping(value = "hello")
     public ResponseEntity<String> responseHello(){
+
+//        dispathcerEnginge.getMyTimer().cancel();
 
         return new ResponseEntity<>("Здравствуйте!", HttpStatus.OK);
     }
