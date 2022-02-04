@@ -5,6 +5,7 @@ import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public interface TaskService {
@@ -35,5 +36,7 @@ public interface TaskService {
     void updateTaskStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
 
     List<Task> getUserTasks(Long UserId);
+
+    ArrayList<Task> getTasksByStatus(TaskStatusEnum taskStatus);
 
 }

@@ -72,7 +72,6 @@ public class UserRestControllerV1 {
                 @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile,
                 @RequestParam("TaskDataFile")MultipartFile TaskDataFile) throws Exception {
 
-
         try{
             User User1 = getUserByToken(token);
             UserDto UserDto1 = new UserDto();

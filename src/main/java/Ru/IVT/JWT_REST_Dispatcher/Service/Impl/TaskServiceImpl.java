@@ -7,7 +7,7 @@ import Ru.IVT.JWT_REST_Dispatcher.Model.Role;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepository;
-import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepositoryNonTransactional;
+import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepositoryNT;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.UserRepository;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskDoesNotExistException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskLimitException;
@@ -26,16 +26,16 @@ import java.util.List;
 public class TaskServiceImpl implements TaskService {
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
-    private final TaskRepositoryNonTransactional taskRepositoryNonTransactional;
+    private final TaskRepositoryNT taskRepositoryNT;
 //    private final JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     public TaskServiceImpl(UserRepository userRepository, TaskRepository taskRepository,/*,
-                           JwtTokenProvider jwtTokenProvider*/TaskRepositoryNonTransactional taskRepositoryNonTransactional) {
+                           JwtTokenProvider jwtTokenProvider*/TaskRepositoryNT taskRepositoryNT) {
         this.userRepository = userRepository;
         this.taskRepository = taskRepository;
 //        this.jwtTokenProvider = jwtTokenProvider;
-        this.taskRepositoryNonTransactional = taskRepositoryNonTransactional;
+        this.taskRepositoryNT = taskRepositoryNT;
     }
 
     private boolean isReachAddTaskLimit(Long userId/*,String token*/) {
@@ -46,7 +46,7 @@ public class TaskServiceImpl implements TaskService {
         Date now = new Date();
         Date hour_before = new Date(now.getTime() - Constanta.taskWindowLimitInMilliseconds);
 
-        if(taskRepositoryNonTransactional.countUserTasksBetween2Dates(userId,hour_before,now)<Constanta.maxLimitTaskAtTokenTime)
+        if(taskRepositoryNT.countUserTasksBetween2Dates(userId,hour_before,now)<Constanta.maxLimitTaskAtTokenTime)
             return true;
         else   return  false;
 
@@ -106,7 +106,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public boolean taskExist(UserDto userDto1, Long taskId) {
 
-        ArrayList<Task> tasks = taskRepositoryNonTransactional.getUserTasks(userDto1.getId());
+        ArrayList<Task> tasks = taskRepositoryNT.getUserTasks(userDto1.getId());
         for (Task task:
              tasks) {
             if (taskId==task.getId()) return true;
@@ -126,7 +126,7 @@ public class TaskServiceImpl implements TaskService {
 //
 //        taskRepository.test();
 
-        ArrayList<Task> tasks = taskRepositoryNonTransactional.getUserTasks(userDto1.getId());
+        ArrayList<Task> tasks = taskRepositoryNT.getUserTasks(userDto1.getId());
         for (Task task:
                 tasks) {
             if (taskName.equals(taskName)) return true;
@@ -137,7 +137,7 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public Task getTaskById(Long taskId) throws Exception {
-        Task task = taskRepositoryNonTransactional.getTaskById(taskId);
+        Task task = taskRepositoryNT.getTaskById(taskId);
 
         if (task!=null){
             return task;
@@ -155,14 +155,14 @@ public class TaskServiceImpl implements TaskService {
 
         if (isUserHaveTask(newTaskDto, UserId)){
 
-            return taskRepositoryNonTransactional.getTaskById(taskId,UserId);
+            return taskRepositoryNT.getTaskById(taskId,UserId);
         }
         else {throw new TaskDoesNotExistException("Задачи с "+taskId+" не существует.");}
     }
 
     @Override
     public Task getTaskByName(String taskName) throws Exception {
-        Task task = taskRepositoryNonTransactional.getTaskByName(taskName);
+        Task task = taskRepositoryNT.getTaskByName(taskName);
 
         if (task!=null){
             return task;
@@ -174,7 +174,7 @@ public class TaskServiceImpl implements TaskService {
     public TaskStatusEnum getStatusById(Long taskId) throws Exception {
 
 
-        try{return taskRepositoryNonTransactional.getTaskById(taskId).getStatus();}
+        try{return taskRepositoryNT.getTaskById(taskId).getStatus();}
         catch (Exception e){throw e;}
 
 
@@ -182,7 +182,7 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public TaskStatusEnum getStatusByName(String taskName) throws Exception {
-        try{return taskRepositoryNonTransactional.getTaskByName(taskName).getStatus();}
+        try{return taskRepositoryNT.getTaskByName(taskName).getStatus();}
         catch (Exception e){throw e;}
     }
 
@@ -193,7 +193,7 @@ public class TaskServiceImpl implements TaskService {
             if (isUserHaveTask(newTaskDto, UserId)){
                 taskRepository.updateTaskByName(newTaskDto.getTask_name(),
                         newTaskDto.getData_file_name(),newTaskDto.getSource_file_name(),UserId);
-                return taskRepositoryNonTransactional.getTaskByName(newTaskDto.getTask_name());
+                return taskRepositoryNT.getTaskByName(newTaskDto.getTask_name());
             }
             else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getTask_name()+" не существует");}
 
@@ -214,7 +214,7 @@ public class TaskServiceImpl implements TaskService {
             if (isUserHaveTask(newTaskDto, UserId)){
                 taskRepository.updateTaskSourceFileByName(newTaskDto.getTask_name(),
                         newTaskDto.getSource_file_name(),UserId);
-                return taskRepositoryNonTransactional.getTaskByName(newTaskDto.getTask_name());
+                return taskRepositoryNT.getTaskByName(newTaskDto.getTask_name());
             }
             else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getTask_name()+" не существует");}
 
@@ -234,7 +234,7 @@ public class TaskServiceImpl implements TaskService {
             if (isUserHaveTask(newTaskDto, UserId)){
                 taskRepository.updateTaskDataFileByName(newTaskDto.getTask_name(),
                         newTaskDto.getData_file_name(),UserId);
-                return taskRepositoryNonTransactional.getTaskByName(newTaskDto.getTask_name());
+                return taskRepositoryNT.getTaskByName(newTaskDto.getTask_name());
             }
             else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getTask_name()+" не существует");}
 
@@ -253,7 +253,7 @@ public class TaskServiceImpl implements TaskService {
 
             if (isUserHaveTask(newTaskDto, UserId)){
                 taskRepository.updateTaskSourceFileById(newTaskDto.getId(), newTaskDto.getSource_file_name(),UserId);
-                return taskRepositoryNonTransactional.getTaskById(newTaskDto.getId());
+                return taskRepositoryNT.getTaskById(newTaskDto.getId());
             }
             else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
 
@@ -272,7 +272,7 @@ public class TaskServiceImpl implements TaskService {
 
             if (isUserHaveTask(newTaskDto, UserId)){
                 taskRepository.updateTaskDataFileById(newTaskDto.getId(), newTaskDto.getData_file_name(), UserId);
-                return taskRepositoryNonTransactional.getTaskById(newTaskDto.getId());
+                return taskRepositoryNT.getTaskById(newTaskDto.getId());
             }
             else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
 
@@ -335,13 +335,20 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public List<Task> getUserTasks(Long UserId) {
-        return taskRepositoryNonTransactional.getUserTasks(UserId);
+        return taskRepositoryNT.getUserTasks(UserId);
+    }
+//
+    @Override
+    public ArrayList<Task> getTasksByStatus(TaskStatusEnum taskStatus) {
+
+        return taskRepositoryNT.getTasksByStatus(taskStatus);
+
     }
 
     private boolean isUserHaveTask(NewTaskDto newTaskDto, Long userId) {
         boolean UserHaveTask = false;
-//        taskRepositoryNonTransactional.u
-        ArrayList<Task> tasks = taskRepositoryNonTransactional.getUserTasks(userId);
+//        taskRepositoryNT.u
+        ArrayList<Task> tasks = taskRepositoryNT.getUserTasks(userId);
         for (Task task: tasks) {
             if (newTaskDto.getId().equals(task.getId())){
                 UserHaveTask = true;
