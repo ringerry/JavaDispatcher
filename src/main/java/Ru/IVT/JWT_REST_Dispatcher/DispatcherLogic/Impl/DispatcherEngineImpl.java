@@ -15,6 +15,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -38,10 +40,16 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
     @Value("${local.paths.save.taskSources}")
     private String taskUploadPath;
 
+//    @Value("${local.paths.dockerTmpDir}")
+    private String dockerDirPath;
+
     public DispatcherEngineImpl(){
-        this.dispatcherPeriodMS = 1000L;
+        this.dispatcherPeriodMS = 10000L;
         this.myTimer = new Timer();
         startMainTimer();
+
+       dockerDirPath = "/home/artem/Dispatcher_files/DockerTmp/";
+
     }
 
 
@@ -73,105 +81,118 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         return Files.exists(path);
     }
 
+    private String getTaskUnZipDir(Long taskId) throws Exception {
+
+        String str = taskService.getTaskById(taskId).getSource_file_name().replace(".zip","");
+
+         return taskService.getTaskById(taskId).getSource_file_name().replace(".zip","");
+    }
+
     private void checkAndPrepareFolders(Long taskId) throws Exception {
         Task task = taskService.getTaskById(taskId);
 
         String sourcesPath = task.getSource_file_name();
         String dataPath = task.getData_file_name();
 
-        String dir2UpZip = sourcesPath.replace(".zip","");
+        String dir2UpZip = getTaskUnZipDir(taskId);
 
         if(!isFolderExist(dir2UpZip)){
 
+            File file = new File(dir2UpZip);
+            file.mkdir();
 
-//            Process p = new ProcessBuilder("unzip", sourcesPath+" -d "+dir2UpZip).start();
+            unzip(sourcesPath,dir2UpZip);
+            unzip(dataPath,dir2UpZip+"/Input");
 
-            Process proc = Runtime.getRuntime().exec("unzip "+ sourcesPath+" -d "+dir2UpZip);
             int a = 1;
-//            unzip(sourcesPath,dir2UpZip);
-//
-//            File destDir = new File(dir2UpZip);
-//            byte[] buffer = new byte[1024];
-//            ZipInputStream zis = new ZipInputStream(new FileInputStream(sourcesPath));
-//            ZipEntry zipEntry = zis.getNextEntry();
-//            while (zipEntry != null) {
-//                // ...
-//
-//                File newFile = newFile(destDir, zipEntry);
-//                if (zipEntry.isDirectory()) {
-//                    if (!newFile.isDirectory() && !newFile.mkdirs()) {
-//                        throw new IOException("Не удалось создать папку" + newFile);
-//                    }
-//                } else {
-//                    // fix for Windows-created archives
-//                    File parent = newFile.getParentFile();
-//                    if (!parent.isDirectory() && !parent.mkdirs()) {
-//                        throw new IOException("Не удалось создать папку " + parent);
-//                    }
-//
-//                    // write file content
-//                    FileOutputStream fos = new FileOutputStream(newFile);
-//                    int len;
-//                    while ((len = zis.read(buffer)) > 0) {
-//                        fos.write(buffer, 0, len);
-//                    }
-//                    fos.close();
-//                }
-//                zipEntry = zis.getNextEntry();
-//
-//            }
-//            zis.closeEntry();
-//            zis.close();
         }
 
 
+    }
+
+    private String getUUIDFromFileName(String fileName){
+
+        fileName = fileName.replace(".zip","");
+
+        Pattern pattern = Pattern.compile("\\..*$");
+        Matcher matcher = pattern.matcher(fileName);
+        String str = null;
+        if(matcher.find()){
+            str =  fileName.substring(matcher.start(), matcher.end());
+        }
+
+//        assert str != null;
+        str = str.replace(".","");
+
+        return str;
+    }
+
+    private String bashCommand(String command,String dir) throws IOException, InterruptedException {
+
+        String fileOut = "/Вывод.txt";
+
+        File file = new File(dir+fileOut);
+
+        file.createNewFile();
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.inheritIO();
+        pb.directory(new File(dir));
+        pb.redirectOutput(file);
+        pb.start();
+
+
+
+        return dir+fileOut;
+
+    }
+
+    private void dockerCreateImage(String dir2UpZip, Long taskId) throws Exception {
+
+//        Path path = Paths.get("${local.paths.save.taskSources}"+"/DockerTmp/Dockerfile");
+//
+//        Files.createFile(path);
+
+//        File dockerDir = new File(dockerDirPath);
+//
+//        if(!dockerDir.exists()) {dockerDir.mkdir();}
+
+        String taskSourceFile = taskService.getTaskById(taskId).getSource_file_name();
+
+
+        try(FileWriter writer = new FileWriter(dir2UpZip+"/Dockerfile", false))
+        {
+            // запись всей строки
+//            String text = "Доброе утро!";
+            writer.write("FROM python\n");
+            writer.write("WORKDIR /code\n");
+            writer.write("COPY . .\n");
+            writer.write("CMD [\"python3\",\"Main.py\"]\n");
+
+            writer.flush();
+        }
+        catch (Exception e ){log.error(e.getMessage());}
+
+
+        String dockerCommand = "echo 'q' | sudo -S docker build -t "+
+                getUUIDFromFileName(taskSourceFile)+" "+dir2UpZip;
+
+        String bashRes = bashCommand(dockerCommand,dir2UpZip);
+
+        Process proc = Runtime.getRuntime().exec(dockerCommand);
+        proc = Runtime.getRuntime().exec("sudo docker images --format \"{{json . }}\"");
+
+//        proc = Runtime.getRuntime().exec("sudo docker run "+taskSourceFile+dir2UpZip);
+
+//
+//        if(isFolderExist(dir2UpZip)){
+//
+//        }
     }
 
 
     public static void unzip(final String zipFilePath, final String unzipLocation) throws IOException {
-
-        if (!(Files.exists(Paths.get(unzipLocation)))) {
-            Files.createDirectories(Paths.get(unzipLocation));
-        }
-        try (ZipInputStream zipInputStream = new ZipInputStream(new FileInputStream(zipFilePath))) {
-            ZipEntry entry = zipInputStream.getNextEntry();
-            while (entry != null) {
-                Path filePath = Paths.get(unzipLocation, entry.getName());
-                if (!entry.isDirectory()) {
-                    unzipFiles(zipInputStream, filePath);
-                } else {
-                    Files.createDirectories(filePath);
-                }
-
-                zipInputStream.closeEntry();
-                entry = zipInputStream.getNextEntry();
-            }
-        }
-    }
-
-    public static void unzipFiles(final ZipInputStream zipInputStream, final Path unzipFilePath) throws IOException {
-
-        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(unzipFilePath.toAbsolutePath().toString()))) {
-            byte[] bytesIn = new byte[1024];
-            int read = 0;
-            while ((read = zipInputStream.read(bytesIn)) != -1) {
-                bos.write(bytesIn, 0, read);
-            }
-        }
-
-    }
-
-    public static File newFile(File destinationDir, ZipEntry zipEntry) throws IOException {
-        File destFile = new File(destinationDir, zipEntry.getName());
-
-        String destDirPath = destinationDir.getCanonicalPath();
-        String destFilePath = destFile.getCanonicalPath();
-
-        if (!destFilePath.startsWith(destDirPath + File.separator)) {
-            throw new IOException("Точка входа вне папки назначения: " + zipEntry.getName());
-        }
-
-        return destFile;
+        Process proc = Runtime.getRuntime().exec("unzip "+ zipFilePath+" -d "+unzipLocation);
     }
 
 
@@ -184,10 +205,21 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
         for (Task task:taskQueue){
             try {
-
                 checkAndPrepareFolders(task.getId());
             }
             catch (Exception e){
+                log.error(e.getMessage());
+            }
+        }
+
+        for (Task task:taskQueue) {
+            try {
+
+                if(isFolderExist(getTaskUnZipDir(task.getId()))){
+                    dockerCreateImage(getTaskUnZipDir(task.getId()),task.getId());
+                }
+
+            }catch (Exception e){
                 log.error(e.getMessage());
             }
         }
