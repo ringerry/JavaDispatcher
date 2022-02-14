@@ -22,11 +22,15 @@ import org.springframework.web.multipart.MultipartFile;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.*;
 
 /**
  * REST controller user connected requestst.
@@ -64,9 +68,35 @@ public class UserRestControllerV1 {
 //        dispathcerEnginge.getMyTimer().cancel();
 
         try{
+//            ProcessBuilder pr = new ProcessBuilder();
+//            pr.command("/home/artem/bash_java.bash");
+//            pr.start();
+
+//            chmod ugo+x file2.bash
+
+
+            Path path = Paths.get("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
+
+            Set<PosixFilePermission> ownerWritable = PosixFilePermissions.fromString("rwxrwxrwx");
+            FileAttribute<?> permissions = PosixFilePermissions.asFileAttribute(ownerWritable);
+            Files.createFile(path, permissions);
+
+
+            //
+        try(FileWriter writer = new FileWriter("/home/artem/Dispatcher_files/DockerTmp/file3.bash", false))
+        {
+            // запись всей строки
+//            String text = "Доброе утро!";
+            writer.write("mkdir ./Привет\n");
+
+            writer.flush();
+        }
+        catch (Exception e ){log.error(e.getMessage());}
+
             ProcessBuilder pr = new ProcessBuilder();
-            pr.command("/home/artem/bash_java.bash");
+            pr.command("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
             pr.start();
+
             log.info("Успешный запуск!");
 
         }

@@ -16,7 +16,11 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Executors;
@@ -65,7 +69,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             public void run() {
                log.info("Квант диспетчера");
                 try {
-//                    dispatcherQuantum();
+                    dispatcherQuantum();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -152,43 +156,70 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
 
         try{
+            Path tmpBashPath = Paths.get(dockerDirPath+"tmpRun.bash");
+            Path tmpCommandResult= Paths.get(dockerDirPath+"CommandResult.txt");
 
-            String fileOut = "/Вывод.txt";
+            FileWriter writer = new FileWriter(tmpBashPath.toString(), false);
+            writer.write(command+"\n");
+            writer.flush();
+            writer.close();
 
-            String[] cmd = {"/bin/bash","-c","echo password|  -S ls"};
-            Process pb = Runtime.getRuntime().exec(cmd);
+            writer = new FileWriter(tmpCommandResult.toString(), false);
+            writer.write(command+"\n");
+            writer.flush();
+            writer.close();
 
+            Set<PosixFilePermission> ownerWritable = PosixFilePermissions.fromString("rwxrwxrwx");
+            FileAttribute<?> permissions = PosixFilePermissions.asFileAttribute(ownerWritable);
 
-//            Runtime.getRuntime().exec(dir+fileOut);
+//            Files.deleteIfExists(tmpBashPath);
+//            Files.createFile(tmpBashPath, permissions);
 
-            File file = new File(dir+fileOut);
-
-            file.createNewFile();
-
-            Process process = Runtime.getRuntime()
-                    .exec(String.format("sh -c echo 'q'| sudo -S mkdir /test123 %s ", "/home/artem"));
-
-//            command = "echo \"q\"| sudo -S mkdir /test";
-
-            MyThread t = new MyThread();
-            t.run();
-
-
+            Files.setPosixFilePermissions(tmpBashPath,ownerWritable);
 
 
-//            runScript("sh /home/artem/test.sh\n");
 
-            ProcessBuilder pb1 = new ProcessBuilder(command);
-            pb1.inheritIO();
-            pb1.directory(new File(dir));
-            pb1.redirectOutput(file);
-            pb1.start();
-            return dir+fileOut;
+            ProcessBuilder pr = new ProcessBuilder();
+            pr.command(tmpBashPath.toString());
+
+            pr.redirectOutput(new File(tmpCommandResult.toString()));
+
+            Process process = pr.start();
+            process.waitFor();
+
+            log.info("Успешный запуск!");
+
 
         }
         catch (Exception e){
-            log.warn(e.getMessage());
+            log.error(e.getMessage());
         }
+
+
+////
+////        try(FileWriter writer = new FileWriter(dir2UpZip+"/Dockerfile", false))
+////        {
+////            // запись всей строки
+//////            String text = "Доброе утро!";
+////            writer.write("FROM python\n");
+////            writer.write("WORKDIR /code\n");
+////            writer.write("COPY . .\n");
+////            writer.write("CMD [\"python3\",\"Main.py\"]\n");
+////
+////            writer.flush();
+////        }
+////        catch (Exception e ){log.error(e.getMessage());}
+//
+//        try{
+//
+//            ProcessBuilder pr = new ProcessBuilder();
+//            pr.command("/home/artem/bash_java.bash");
+//            pr.start();
+//
+//        }
+//        catch (Exception e){
+//            log.error(e.getMessage());
+//        }
 
         return "";
 
@@ -247,8 +278,10 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
         String bashRes = bashCommand(dockerCommand,dir2UpZip);
 
-        Process proc = Runtime.getRuntime().exec(dockerCommand);
-        proc = Runtime.getRuntime().exec("sudo docker images --format \"{{json . }}\"");
+        int a  = 1;
+
+//        Process proc = Runtime.getRuntime().exec(dockerCommand);
+//        proc = Runtime.getRuntime().exec("sudo docker images --format \"{{json . }}\"");
 
 //        proc = Runtime.getRuntime().exec("sudo docker run "+taskSourceFile+dir2UpZip);
 
