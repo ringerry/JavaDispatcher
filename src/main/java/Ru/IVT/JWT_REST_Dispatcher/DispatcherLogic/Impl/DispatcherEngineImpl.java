@@ -1,11 +1,15 @@
 package Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl;
 
 
+import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.StreamGobbler;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepositoryNT;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.exec.CommandLine;
+import org.apache.commons.exec.DefaultExecutor;
+import org.apache.commons.exec.ExecuteException;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.io.*;
@@ -15,6 +19,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -60,7 +65,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             public void run() {
                log.info("Квант диспетчера");
                 try {
-                    dispatcherQuantum();
+//                    dispatcherQuantum();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -127,24 +132,85 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         return str;
     }
 
+    public static class MyThread extends Thread {
+        @Override
+        public void run() {
+            String command = "echo \"q\"| sudo -S mkdir /test";
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.inheritIO();
+//            pb.directory(new File(dir));
+//            pb.redirectOutput(file);
+            try {
+                pb.start();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
     private String bashCommand(String command,String dir) throws IOException, InterruptedException {
 
-        String fileOut = "/Вывод.txt";
 
-        File file = new File(dir+fileOut);
+        try{
 
-        file.createNewFile();
+            String fileOut = "/Вывод.txt";
 
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.inheritIO();
-        pb.directory(new File(dir));
-        pb.redirectOutput(file);
-        pb.start();
+            String[] cmd = {"/bin/bash","-c","echo password|  -S ls"};
+            Process pb = Runtime.getRuntime().exec(cmd);
 
 
+//            Runtime.getRuntime().exec(dir+fileOut);
 
-        return dir+fileOut;
+            File file = new File(dir+fileOut);
 
+            file.createNewFile();
+
+            Process process = Runtime.getRuntime()
+                    .exec(String.format("sh -c echo 'q'| sudo -S mkdir /test123 %s ", "/home/artem"));
+
+//            command = "echo \"q\"| sudo -S mkdir /test";
+
+            MyThread t = new MyThread();
+            t.run();
+
+
+
+
+//            runScript("sh /home/artem/test.sh\n");
+
+            ProcessBuilder pb1 = new ProcessBuilder(command);
+            pb1.inheritIO();
+            pb1.directory(new File(dir));
+            pb1.redirectOutput(file);
+            pb1.start();
+            return dir+fileOut;
+
+        }
+        catch (Exception e){
+            log.warn(e.getMessage());
+        }
+
+        return "";
+
+    }
+
+    public void runScript(String command){
+        int iExitValue;
+        String sCommandString;
+
+        sCommandString = command;
+        CommandLine oCmdLine = CommandLine.parse(sCommandString);
+        DefaultExecutor oDefaultExecutor = new DefaultExecutor();
+        oDefaultExecutor.setExitValue(0);
+        try {
+            iExitValue = oDefaultExecutor.execute(oCmdLine);
+        } catch (ExecuteException e) {
+            System.err.println("Execution failed.");
+            e.printStackTrace();
+        } catch (IOException e) {
+            System.err.println("permission denied.");
+            e.printStackTrace();
+        }
     }
 
     private void dockerCreateImage(String dir2UpZip, Long taskId) throws Exception {
@@ -156,6 +222,8 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 //        File dockerDir = new File(dockerDirPath);
 //
 //        if(!dockerDir.exists()) {dockerDir.mkdir();}
+
+
 
         String taskSourceFile = taskService.getTaskById(taskId).getSource_file_name();
 
@@ -208,7 +276,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
                 checkAndPrepareFolders(task.getId());
             }
             catch (Exception e){
-                log.error(e.getMessage());
+                log.warn(e.getMessage());
             }
         }
 
@@ -220,7 +288,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
                 }
 
             }catch (Exception e){
-                log.error(e.getMessage());
+                log.warn(e.getMessage());
             }
         }
 

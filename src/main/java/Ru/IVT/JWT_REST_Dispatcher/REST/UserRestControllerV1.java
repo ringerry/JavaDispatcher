@@ -11,6 +11,7 @@ import Ru.IVT.JWT_REST_Dispatcher.Service.TaskDoesNotExistException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskLimitException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,7 @@ import java.util.UUID;
  */
 
 // TODO еще одну сущноть пользователия для отправки
+@Slf4j
 @RestController
 @RequestMapping(value = "/api/")
 public class UserRestControllerV1 {
@@ -60,6 +62,17 @@ public class UserRestControllerV1 {
     public ResponseEntity<String> responseHello(){
 
 //        dispathcerEnginge.getMyTimer().cancel();
+
+        try{
+            ProcessBuilder pr = new ProcessBuilder();
+            pr.command("/home/artem/bash_java.bash");
+            pr.start();
+            log.info("Успешный запуск!");
+
+        }
+        catch (IOException e){
+            log.error(e.getMessage());
+        }
 
         return new ResponseEntity<>("Здравствуйте!", HttpStatus.OK);
     }
