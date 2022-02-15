@@ -11,6 +11,8 @@ import Ru.IVT.JWT_REST_Dispatcher.Service.TaskDoesNotExistException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskLimitException;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Service.UserService;
+import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
+import liquibase.util.file.FilenameUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,9 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -219,20 +219,6 @@ public class UserRestControllerV1 {
             throw exc;
         }
 
-    }
-
-    private String getWhiteTaskUpdateList() {
-       return TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ+", или "+TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ+", или "+
-                TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА+", или "+TaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ+", или "+
-               TaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ+".";
-    }
-
-    private boolean isCanUpdateTask(Task task) {
-        return task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ ||
-                task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ ||
-                task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА||
-                task.getStatus() == TaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ||
-                task.getStatus() == TaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ;
     }
 
     @PostMapping(value = "add_data",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -507,7 +493,64 @@ public class UserRestControllerV1 {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
 
+        }
+        catch (TaskDoesNotExistException e ){
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",e.getMessage());
 
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+    @PostMapping(value = "delete_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    deleteTask(@RequestHeader("Authorization") String token,
+                  @RequestParam(value = "TaskName") String TaskName,
+                  @RequestParam(value = "TaskId") Long TaskId) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+            User User1 = getUserByToken(token);
+
+            NewTaskDto newTaskDto = new NewTaskDto();
+            newTaskDto.setId(TaskId);
+            newTaskDto.setStatus(TaskStatusEnum.УДАЛЕНА);
+
+
+            // Удалить все папки и файлы данной задачи
+
+            taskService.updateTaskStatus(newTaskDto,User1.getId());
+
+            Task task = taskService.getTaskById(TaskId,User1.getId());
+
+
+
+
+            String taskFolder = taskService.getUnzipDirById(TaskId,User1.getId());
+
+
+            BashTools.bashCommand("echo 'q' |  sudo -S rm -R "+taskFolder,"");
+
+            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getSource_file_name(),"");
+            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getData_file_name(),"");
+//            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getResult_file(),"");
+
+            taskService.deleteTask(newTaskDto,User1.getId());
+
+
+            Map<Object,Object> response = new HashMap<>();
+
+
+            String msg = "Задача удалена";
+            response.put("Описание",msg);
+            response.put("Id_задачи",TaskId);
+
+            return ResponseEntity.ok(response);
 
         }
         catch (TaskDoesNotExistException e ){
@@ -521,6 +564,31 @@ public class UserRestControllerV1 {
         }
 
     }
+
+    private String getFileExtention(String filename){
+        String extension = Optional.of(filename)
+                .filter(f -> f.contains("."))
+                .map(f -> f.substring(filename.lastIndexOf(".") + 1))
+                .orElse("");
+
+        return extension.toLowerCase(Locale.ROOT);
+    }
+
+
+    private String getWhiteTaskUpdateList() {
+        return TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ+", или "+TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ+", или "+
+                TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА+", или "+TaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ+", или "+
+                TaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ+".";
+    }
+
+    private boolean isCanUpdateTask(Task task) {
+        return task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ ||
+                task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ ||
+                task.getStatus() == TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА||
+                task.getStatus() == TaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ||
+                task.getStatus() == TaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ;
+    }
+
 
     private Map<Object, Object> getBasicResponseBody(Task runTask, String msg) {
         Map<Object,Object> response = new HashMap<>();
@@ -549,12 +617,28 @@ public class UserRestControllerV1 {
             }
 
 
+
+
             User User1 = getUserByToken(token);
             UserDto UserDto1 = new UserDto();
             UserDto1.setId(User1.getId());
 
             if((taskSourcesFile != null && taskDataFile!=null)&&
                     (!taskSourcesFile.isEmpty()&&!taskDataFile.isEmpty())){
+
+                if(!isZipFile(taskSourcesFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
+
+                if(!isZipFile(taskDataFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
 
                 NewTaskDto newTaskDto = getNewTaskDto(token, taskName, taskId, taskSourcesFile, taskDataFile);
                 newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
@@ -578,6 +662,14 @@ public class UserRestControllerV1 {
             else if(taskSourcesFile != null && taskDataFile==null&&
                     (!taskSourcesFile.isEmpty()))
             {
+
+                if(!isZipFile(taskSourcesFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
+
                 // Обновить исходники
                 NewTaskDto newTaskDto = getNewTaskDto(token, taskName, taskId, taskSourcesFile, taskDataFile);
 
@@ -619,6 +711,15 @@ public class UserRestControllerV1 {
             }
             else if (taskSourcesFile == null && taskDataFile!=null&&
                     (!taskDataFile.isEmpty())){
+
+
+                if(!isZipFile(taskDataFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
+
                 //Обновить данные
 
                 NewTaskDto newTaskDto = getNewTaskDto(token, taskName, taskId, taskSourcesFile, taskDataFile);
@@ -722,6 +823,20 @@ public class UserRestControllerV1 {
             if(TaskSourcesFile != null && TaskDataFile!=null&&
                     (!TaskSourcesFile.isEmpty()&&!TaskDataFile.isEmpty())){
 
+                if(!isZipFile(TaskSourcesFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
+
+                if(!isZipFile(TaskDataFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
+
                 NewTaskDto newTaskDto = getNewTaskDtoName(token, TaskName, TaskSourcesFile, TaskDataFile);
                 // Добавить в очередь, диспетчер сам просканирует, что выполнять
                 newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА);
@@ -740,6 +855,12 @@ public class UserRestControllerV1 {
             else if(TaskSourcesFile != null && TaskDataFile==null&&
                     (!TaskSourcesFile.isEmpty())){
 
+                if(!isZipFile(TaskSourcesFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
+
                 // Новые исходники
                 NewTaskDto newTaskDto = getNewTaskDtoName(token, TaskName, TaskSourcesFile, TaskDataFile);
                 newTaskDto.setStatus(TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ);
@@ -756,6 +877,13 @@ public class UserRestControllerV1 {
             }
             else if (TaskSourcesFile == null && TaskDataFile!=null&&
                     (!TaskDataFile.isEmpty())){
+
+                if(!isZipFile(TaskDataFile)){
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Формат файла: *.zip");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                }
 
                 // Новые данные
                 NewTaskDto newTaskDto = getNewTaskDtoName(token, TaskName, TaskSourcesFile, TaskDataFile);
@@ -791,6 +919,23 @@ public class UserRestControllerV1 {
         catch (Exception exception){
             throw new Exception(exception);
         }
+    }
+
+    private boolean isZipFile(MultipartFile file) throws IOException {
+
+        String file_type = file.getContentType();
+
+        byte [] byteArr=file.getBytes();
+
+        int a = 1;
+
+        if(byteArr[0]==80&&byteArr[1]==75&&byteArr[2]==3&&byteArr[3]==4) {
+
+            if(getFileExtention(file.getOriginalFilename()).equals("zip"))
+            return true;
+        }
+        return false;
+
     }
 
 

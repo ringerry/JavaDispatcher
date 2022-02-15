@@ -354,6 +354,56 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public void deleteTask(NewTaskDto newTaskDto,Long userId) throws Exception {
+        try{
+
+            if (isUserHaveTask(newTaskDto, userId)){
+                taskRepository.deleteTaskById(newTaskDto.getId(),userId);
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public String getUnzipDirById(Long taskId, Long UserID) throws TaskDoesNotExistException {
+
+        try{
+
+            NewTaskDto newTaskDto = new NewTaskDto();
+            newTaskDto.setId(taskId);
+
+            if (isUserHaveTask(newTaskDto, UserID)){
+                Task task = taskRepositoryNT.getTaskById(taskId);
+
+                String str = task.getSource_file_name().replace(".zip","");
+
+                return str;
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+
+
+
+
+    }
+
+    @Override
     public List<Task> getUserTasks(Long UserId) {
         return taskRepositoryNT.getUserTasks(UserId);
     }

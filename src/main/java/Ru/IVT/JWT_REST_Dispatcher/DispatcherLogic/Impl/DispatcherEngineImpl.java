@@ -6,6 +6,7 @@ import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepositoryNT;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
+import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
@@ -130,7 +131,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             file.mkdir();
 
             unzip(sourcesPath,dir2UpZip);
-            unzip(dataPath,dir2UpZip+"/Input");
+            unzip(dataPath,dir2UpZip/*+"/Input"*/);
 
             int a = 1;
         }
@@ -159,6 +160,9 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
 
         try{
+
+
+
             Path tmpBashPath = Paths.get(dockerDirPath+"tmpRun.bash");
             Path tmpCommandResult= Paths.get(dockerDirPath+"CommandResult.txt");
 
@@ -199,10 +203,6 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
             throw e;
 
-//            ArrayList<String> ret = new ArrayList<String>();
-//            ret.add(e.getMessage());
-//
-//            return ret;
         }
     }
 
@@ -229,7 +229,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
                 getUUIDFromFileName(taskSourceFile)+" "+dir2UpZip;
 
         try{
-            ArrayList<String> bashRes = bashCommand(dockerCommand,dir2UpZip);
+            ArrayList<String> bashRes = BashTools.bashCommand(dockerCommand,dir2UpZip);
         }
         catch (Exception e){
             throw e;

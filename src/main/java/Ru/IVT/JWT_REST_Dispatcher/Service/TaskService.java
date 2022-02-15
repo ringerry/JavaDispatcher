@@ -36,6 +36,10 @@ public interface TaskService {
     void updateTaskStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
     void updateTaskInsideStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
 
+    void deleteTask(NewTaskDto newTaskDto,Long userId) throws Exception;
+
+    String getUnzipDirById(Long taskId,Long UserID) throws TaskDoesNotExistException;
+
     List<Task> getUserTasks(Long UserId);
 
     ArrayList<Task> getTasksByStatus(TaskStatusEnum taskStatus);
