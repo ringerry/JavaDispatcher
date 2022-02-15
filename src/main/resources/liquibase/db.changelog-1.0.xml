@@ -233,5 +233,17 @@
     </changeSet>
 
 
+    <changeSet id="1.0.16" author="МеньшиковАртём">
+
+        <sql>ALTER TABLE task ADD COLUMN inside_status TEXT DEFAULT 'НЕ_ОПРЕДЕЛЕНО';</sql>
+        <sql>ALTER TABLE task ADD COLUMN result_file TEXT NULL;</sql>
+        <sql>ALTER TABLE task ADD COLUMN task_order INT DEFAULT -1;</sql>
+
+
+    </changeSet>
+
+
+
+
 
 </databaseChangeLog>

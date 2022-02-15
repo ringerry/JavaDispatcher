@@ -34,6 +34,7 @@ public interface TaskService {
     void updateTaskFilesById(NewTaskDto newTaskDto, Long userId) throws Exception;
 
     void updateTaskStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
+    void updateTaskInsideStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
 
     List<Task> getUserTasks(Long UserId);
 

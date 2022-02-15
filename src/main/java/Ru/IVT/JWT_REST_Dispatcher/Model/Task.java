@@ -68,6 +68,18 @@ public class Task {
     protected List<TaskInRun> task_in_runs;
 
 
+    @ToString.Exclude
+    @Enumerated(EnumType.STRING)
+    private InsideTaskStatusEnum inside_status;
+
+    @ToString.Exclude
+    private String result_file;
+
+    @ToString.Exclude
+    private Integer task_order;
+
+
+
 //    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
 //    @JoinColumn(name="User_Id")
 

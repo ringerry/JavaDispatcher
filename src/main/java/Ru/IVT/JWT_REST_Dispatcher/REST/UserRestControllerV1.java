@@ -65,44 +65,44 @@ public class UserRestControllerV1 {
     @GetMapping(value = "hello")
     public ResponseEntity<String> responseHello(){
 
-//        dispathcerEnginge.getMyTimer().cancel();
-
-        try{
+////        dispathcerEnginge.getMyTimer().cancel();
+//
+//        try{
+////            ProcessBuilder pr = new ProcessBuilder();
+////            pr.command("/home/artem/bash_java.bash");
+////            pr.start();
+//
+////            chmod ugo+x file2.bash
+//
+//
+//            Path path = Paths.get("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
+//
+//            Set<PosixFilePermission> ownerWritable = PosixFilePermissions.fromString("rwxrwxrwx");
+//            FileAttribute<?> permissions = PosixFilePermissions.asFileAttribute(ownerWritable);
+//            Files.createFile(path, permissions);
+//
+//
+//            //
+//        try(FileWriter writer = new FileWriter("/home/artem/Dispatcher_files/DockerTmp/file3.bash", false))
+//        {
+//            // запись всей строки
+////            String text = "Доброе утро!";
+//            writer.write("mkdir ./Привет\n");
+//
+//            writer.flush();
+//        }
+//        catch (Exception e ){log.error(e.getMessage());}
+//
 //            ProcessBuilder pr = new ProcessBuilder();
-//            pr.command("/home/artem/bash_java.bash");
+//            pr.command("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
 //            pr.start();
-
-//            chmod ugo+x file2.bash
-
-
-            Path path = Paths.get("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
-
-            Set<PosixFilePermission> ownerWritable = PosixFilePermissions.fromString("rwxrwxrwx");
-            FileAttribute<?> permissions = PosixFilePermissions.asFileAttribute(ownerWritable);
-            Files.createFile(path, permissions);
-
-
-            //
-        try(FileWriter writer = new FileWriter("/home/artem/Dispatcher_files/DockerTmp/file3.bash", false))
-        {
-            // запись всей строки
-//            String text = "Доброе утро!";
-            writer.write("mkdir ./Привет\n");
-
-            writer.flush();
-        }
-        catch (Exception e ){log.error(e.getMessage());}
-
-            ProcessBuilder pr = new ProcessBuilder();
-            pr.command("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
-            pr.start();
-
-            log.info("Успешный запуск!");
-
-        }
-        catch (IOException e){
-            log.error(e.getMessage());
-        }
+//
+//            log.info("Успешный запуск!");
+//
+//        }
+//        catch (IOException e){
+//            log.error(e.getMessage());
+//        }
 
         return new ResponseEntity<>("Здравствуйте!", HttpStatus.OK);
     }

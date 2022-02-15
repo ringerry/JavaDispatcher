@@ -1,4 +1,5 @@
 package Ru.IVT.JWT_REST_Dispatcher.Repository;
+import Ru.IVT.JWT_REST_Dispatcher.Model.InsideTaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -70,6 +71,12 @@ public interface TaskRepository extends JpaRepository<Task, Long>{
             @Param("UserId") Long UserId);
 
 
+    @Modifying
+    @Query(value = "UPDATE Task t SET t.inside_status=:inside_status WHERE t.id = :id AND t.user_id = :UserId")
+    void updateTaskInsideStatusById(
+            @Param("id") Long id,
+            @Param("inside_status") TaskStatusEnum inside_status,
+            @Param("UserId") Long UserId);
 
 
 //    @Modifying

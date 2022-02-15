@@ -334,6 +334,26 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public void updateTaskInsideStatus(NewTaskDto newTaskDto, Long userId) throws Exception {
+        try{
+
+            if (isUserHaveTask(newTaskDto, userId)){
+                taskRepository.updateTaskInsideStatusById(newTaskDto.getId(),newTaskDto.getStatus(),userId);
+
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
     public List<Task> getUserTasks(Long UserId) {
         return taskRepositoryNT.getUserTasks(UserId);
     }

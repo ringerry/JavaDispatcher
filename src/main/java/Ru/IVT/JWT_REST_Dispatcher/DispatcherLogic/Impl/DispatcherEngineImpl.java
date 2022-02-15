@@ -19,10 +19,7 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.util.ArrayList;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -57,10 +54,32 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         this.myTimer = new Timer();
         startMainTimer();
 
+        // Отображение внешнего состояния на внутреннее с разрешением противоречий.
+
+        mappingOutside2InsideTaskState();
+
+
        dockerDirPath = "/home/artem/Dispatcher_files/DockerTmp/";
 
     }
 
+    // Отображение внешнего состояния на внутреннее с разрешением противоречий.
+    private void mappingOutside2InsideTaskState() {
+        /*По умолчанию - не определено, если не определено то отобразить, иначе - главенство внутреннего состояния
+        * */
+
+
+
+    }
+
+    private void mappingInside2OutsideTaskState() {
+        /*По умолчанию - не определено, если не определено то отобразить, иначе - главенство внутреннего состояния
+         * */
+    }
+
+    public void setTaskService(TaskService taskService){
+        this.taskService = taskService;
+    }
 
 
     private void startMainTimer() {
@@ -136,23 +155,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         return str;
     }
 
-    public static class MyThread extends Thread {
-        @Override
-        public void run() {
-            String command = "echo \"q\"| sudo -S mkdir /test";
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.inheritIO();
-//            pb.directory(new File(dir));
-//            pb.redirectOutput(file);
-            try {
-                pb.start();
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        }
-    }
-
-    private String bashCommand(String command,String dir) throws IOException, InterruptedException {
+    private ArrayList<String> bashCommand(String command, String dir) throws IOException, InterruptedException {
 
 
         try{
@@ -165,18 +168,14 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             writer.close();
 
             writer = new FileWriter(tmpCommandResult.toString(), false);
-            writer.write(command+"\n");
             writer.flush();
             writer.close();
 
             Set<PosixFilePermission> ownerWritable = PosixFilePermissions.fromString("rwxrwxrwx");
             FileAttribute<?> permissions = PosixFilePermissions.asFileAttribute(ownerWritable);
 
-//            Files.deleteIfExists(tmpBashPath);
-//            Files.createFile(tmpBashPath, permissions);
 
             Files.setPosixFilePermissions(tmpBashPath,ownerWritable);
-
 
 
             ProcessBuilder pr = new ProcessBuilder();
@@ -187,73 +186,28 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             Process process = pr.start();
             process.waitFor();
 
+
+
             log.info("Успешный запуск!");
+
+            return (ArrayList<String>) Files.readAllLines(tmpCommandResult);
 
 
         }
         catch (Exception e){
             log.error(e.getMessage());
-        }
 
+            throw e;
 
-////
-////        try(FileWriter writer = new FileWriter(dir2UpZip+"/Dockerfile", false))
-////        {
-////            // запись всей строки
-//////            String text = "Доброе утро!";
-////            writer.write("FROM python\n");
-////            writer.write("WORKDIR /code\n");
-////            writer.write("COPY . .\n");
-////            writer.write("CMD [\"python3\",\"Main.py\"]\n");
-////
-////            writer.flush();
-////        }
-////        catch (Exception e ){log.error(e.getMessage());}
+//            ArrayList<String> ret = new ArrayList<String>();
+//            ret.add(e.getMessage());
 //
-//        try{
-//
-//            ProcessBuilder pr = new ProcessBuilder();
-//            pr.command("/home/artem/bash_java.bash");
-//            pr.start();
-//
-//        }
-//        catch (Exception e){
-//            log.error(e.getMessage());
-//        }
-
-        return "";
-
-    }
-
-    public void runScript(String command){
-        int iExitValue;
-        String sCommandString;
-
-        sCommandString = command;
-        CommandLine oCmdLine = CommandLine.parse(sCommandString);
-        DefaultExecutor oDefaultExecutor = new DefaultExecutor();
-        oDefaultExecutor.setExitValue(0);
-        try {
-            iExitValue = oDefaultExecutor.execute(oCmdLine);
-        } catch (ExecuteException e) {
-            System.err.println("Execution failed.");
-            e.printStackTrace();
-        } catch (IOException e) {
-            System.err.println("permission denied.");
-            e.printStackTrace();
+//            return ret;
         }
     }
+
 
     private void dockerCreateImage(String dir2UpZip, Long taskId) throws Exception {
-
-//        Path path = Paths.get("${local.paths.save.taskSources}"+"/DockerTmp/Dockerfile");
-//
-//        Files.createFile(path);
-
-//        File dockerDir = new File(dockerDirPath);
-//
-//        if(!dockerDir.exists()) {dockerDir.mkdir();}
-
 
 
         String taskSourceFile = taskService.getTaskById(taskId).getSource_file_name();
@@ -261,8 +215,6 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
         try(FileWriter writer = new FileWriter(dir2UpZip+"/Dockerfile", false))
         {
-            // запись всей строки
-//            String text = "Доброе утро!";
             writer.write("FROM python\n");
             writer.write("WORKDIR /code\n");
             writer.write("COPY . .\n");
@@ -276,26 +228,30 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         String dockerCommand = "echo 'q' | sudo -S docker build -t "+
                 getUUIDFromFileName(taskSourceFile)+" "+dir2UpZip;
 
-        String bashRes = bashCommand(dockerCommand,dir2UpZip);
+        try{
+            ArrayList<String> bashRes = bashCommand(dockerCommand,dir2UpZip);
+        }
+        catch (Exception e){
+            throw e;
+        }
 
         int a  = 1;
 
-//        Process proc = Runtime.getRuntime().exec(dockerCommand);
-//        proc = Runtime.getRuntime().exec("sudo docker images --format \"{{json . }}\"");
-
-//        proc = Runtime.getRuntime().exec("sudo docker run "+taskSourceFile+dir2UpZip);
-
-//
-//        if(isFolderExist(dir2UpZip)){
-//
-//        }
     }
 
 
-    public static void unzip(final String zipFilePath, final String unzipLocation) throws IOException {
+    private void unzip(final String zipFilePath, final String unzipLocation) throws IOException {
         Process proc = Runtime.getRuntime().exec("unzip "+ zipFilePath+" -d "+unzipLocation);
     }
 
+
+    private boolean isDockerImageExist(Long taskId) throws Exception {
+        Task task = taskService.getTaskById(taskId);
+
+
+        return true;
+
+    }
 
 
     // Основная логика диспетчера
@@ -332,11 +288,12 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         }
 
 
+        // Функция отображения внутренего состояния задачи на внешнее
+
+
     }
 
-    public void setTaskService(TaskService taskService){
-        this.taskService = taskService;
-    }
+
 
 
 }
