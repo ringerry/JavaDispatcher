@@ -9,7 +9,9 @@ import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -31,6 +33,7 @@ import java.util.regex.Pattern;
  */
 
 @Slf4j
+@Component
 public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
 
@@ -51,12 +54,16 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 //    @Value("${local.paths.dockerTmpDir}")
     private String dockerDirPath;
 
-    public DispatcherEngineImpl(){
+    @Autowired
+    public DispatcherEngineImpl(TaskService taskService){
         this.dispatcherQuantumPeriodMS = 10000L;
         this.quantumsAtRaundRobin = 7;
         this.curQuantumAtRaundRobin = 0;
+        this.roundRobinTaskQueue = new LinkedList<>();
         this.myTimer = new Timer();
         startMainTimer();
+
+        this.taskService = taskService;
 
         // Отображение внешнего состояния на внутреннее с разрешением противоречий.
 
@@ -353,7 +360,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
 
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
-        isDockerImageExist(taskQueue.get(0).getId());
+//        isDockerImageExist(taskQueue.get(0).getId());
 
         for (Task task:taskQueue){
             try {
@@ -381,7 +388,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         checkTaskCompleteOrHaveTheErrors();
 
         // Первый запуск или обошли круг
-        if(this.curQuantumAtRaundRobin ==0){
+        if(this.curQuantumAtRaundRobin ==0&&roundRobinTaskQueue.size()!=0){
             //Сердце диспетчера!
 
             Task firstTask = roundRobinTaskQueue.getFirst();

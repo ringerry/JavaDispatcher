@@ -5,14 +5,14 @@ import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl.DispatcherEngineImpl;
 
 public class DispatcherProvider {
 
-    private DispatcherEngineImpl dispatcher;
-
-    public DispatcherProvider(){
-        this.dispatcher = new DispatcherEngineImpl() ;
-
-    }
-
-    public DispatcherEngineImpl getDispatcher() {
-        return this.dispatcher;
-    }
+//    private DispatcherEngineImpl dispatcher;
+//
+//    public DispatcherProvider(){
+//        this.dispatcher = new DispatcherEngineImpl() ;
+//
+//    }
+//
+//    public DispatcherEngineImpl getDispatcher() {
+//        return this.dispatcher;
+//    }
 }

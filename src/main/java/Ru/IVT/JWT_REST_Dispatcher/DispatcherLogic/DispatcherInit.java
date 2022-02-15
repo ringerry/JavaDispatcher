@@ -9,13 +9,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class DispatcherInit {
 
-    private final TaskService taskService;
-
-    @Autowired
-    public DispatcherInit(TaskService taskService) {
-        this.taskService = taskService;
-
-        JwtDispatcherApplication.getDispatcherEngine().setTaskService(taskService);
-
-    }
+//    private final TaskService taskService;
+//
+//    @Autowired
+//    public DispatcherInit(TaskService taskService) {
+//        this.taskService = taskService;
+//
+//        JwtDispatcherApplication.getDispatcherEngine().setTaskService(taskService);
+//
+//    }
 }

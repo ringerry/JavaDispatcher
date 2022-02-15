@@ -59,7 +59,7 @@ public class UserRestControllerV1 {
         this.userService = userService;
         this.taskService = taskService;
 //        this.dispathcerProvider = dispathcerProvider;
-        this.dispathcerEnginge = JwtDispatcherApplication.getDispatcherEngine();
+//        this.dispathcerEnginge = JwtDispatcherApplication.getDispatcherEngine();
     }
 
     @GetMapping(value = "hello")

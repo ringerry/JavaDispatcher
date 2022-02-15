@@ -7,16 +7,16 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class JwtDispatcherApplication {
 
-	private static DispatcherEngineImpl dispatcherEngine;
+//	private static DispatcherEngineImpl dispatcherEngine;
 
 	public static void main(String[] args) {
 
-		dispatcherEngine = new DispatcherEngineImpl();
+//		dispatcherEngine = new DispatcherEngineImpl();
 
 		SpringApplication.run(JwtDispatcherApplication.class, args);
 	}
 
-	public static DispatcherEngineImpl getDispatcherEngine() {
-		return dispatcherEngine;
-	}
+//	public static DispatcherEngineImpl getDispatcherEngine() {
+//		return dispatcherEngine;
+//	}
 }
