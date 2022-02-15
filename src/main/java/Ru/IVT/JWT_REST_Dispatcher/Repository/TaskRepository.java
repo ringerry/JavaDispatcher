@@ -8,9 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Date;
-
 @Transactional
 public interface TaskRepository extends JpaRepository<Task, Long>{
 
@@ -70,13 +67,25 @@ public interface TaskRepository extends JpaRepository<Task, Long>{
             @Param("status") TaskStatusEnum status,
             @Param("UserId") Long UserId);
 
+    @Modifying
+    @Query(value = "UPDATE Task t SET t.status=:status WHERE t.id = :id ")
+    void updateTaskStatusByTaskId(
+            @Param("id") Long id,
+            @Param("status") TaskStatusEnum status);
+
 
     @Modifying
     @Query(value = "UPDATE Task t SET t.inside_status=:inside_status WHERE t.id = :id AND t.user_id = :UserId")
-    void updateTaskInsideStatusById(
+    void updateInsideTaskStatusWithUserId(
             @Param("id") Long id,
-            @Param("inside_status") TaskStatusEnum inside_status,
+            @Param("inside_status") InsideTaskStatusEnum inside_status,
             @Param("UserId") Long UserId);
+
+    @Modifying
+    @Query(value = "UPDATE Task t SET t.inside_status=:inside_status WHERE t.id = :id")
+    void updateInsideTaskStatusByTaskId(
+            @Param("id") Long id,
+            @Param("inside_status") InsideTaskStatusEnum inside_status);
 
 
     @Modifying

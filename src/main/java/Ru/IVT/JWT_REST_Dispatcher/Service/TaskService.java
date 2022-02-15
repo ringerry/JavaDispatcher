@@ -2,6 +2,7 @@ package Ru.IVT.JWT_REST_Dispatcher.Service;
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
 import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
+import Ru.IVT.JWT_REST_Dispatcher.Model.InsideTaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 
@@ -34,7 +35,10 @@ public interface TaskService {
     void updateTaskFilesById(NewTaskDto newTaskDto, Long userId) throws Exception;
 
     void updateTaskStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
-    void updateTaskInsideStatus(NewTaskDto newTaskDto, Long userId) throws Exception;
+    void updateTaskStatusByTaskId(NewTaskDto newTaskDto) throws Exception;
+    void updateInsideTaskStatus(NewTaskDto newTaskDto) throws Exception;
+
+    void updateInsideTaskStatusWithUserId(NewTaskDto newTaskDto, Long userId) throws Exception;
 
     void deleteTask(NewTaskDto newTaskDto,Long userId) throws Exception;
 
@@ -43,5 +47,7 @@ public interface TaskService {
     List<Task> getUserTasks(Long UserId);
 
     ArrayList<Task> getTasksByStatus(TaskStatusEnum taskStatus);
+    ArrayList<Task> getTasksByInsideStatus(InsideTaskStatusEnum insideTaskStatus);
+    ArrayList<Task> getAllTasks();
 
 }

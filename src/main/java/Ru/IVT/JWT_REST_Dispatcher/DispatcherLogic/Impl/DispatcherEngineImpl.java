@@ -1,31 +1,22 @@
 package Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl;
 
 
-import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.StreamGobbler;
+import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
+import Ru.IVT.JWT_REST_Dispatcher.Model.InsideTaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
-import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepositoryNT;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.exec.CommandLine;
-import org.apache.commons.exec.DefaultExecutor;
-import org.apache.commons.exec.ExecuteException;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.FileAttribute;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
-import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /**
  * Диспетчеризация, алгоритмы приоритетов
@@ -40,7 +31,10 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
     private TaskService taskService;
 
-    private Long dispatcherPeriodMS;
+    private Long dispatcherQuantumPeriodMS;
+    private Integer quantumsAtRaundRobin;
+    private Integer curQuantumAtRaundRobin;
+    private LinkedList<Task> roundRobinTaskQueue;
 
     private final Timer myTimer; // Создаем таймер
 
@@ -51,16 +45,50 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
     private String dockerDirPath;
 
     public DispatcherEngineImpl(){
-        this.dispatcherPeriodMS = 10000L;
+        this.dispatcherQuantumPeriodMS = 10000L;
+        this.quantumsAtRaundRobin = 7;
+        this.curQuantumAtRaundRobin = 0;
         this.myTimer = new Timer();
         startMainTimer();
 
         // Отображение внешнего состояния на внутреннее с разрешением противоречий.
 
         mappingOutside2InsideTaskState();
+        initTaskQueue();
 
 
        dockerDirPath = "/home/artem/Dispatcher_files/DockerTmp/";
+
+    }
+
+    private void initTaskQueue() {
+
+
+        ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
+
+
+        for (Task task:taskQueue){
+            try {
+                roundRobinTaskQueue.addLast(task);
+            }
+            catch (Exception e){
+                log.warn(e.getMessage());
+            }
+        }
+
+        taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
+
+
+        for (Task task:taskQueue){
+            try {
+                roundRobinTaskQueue.addLast(task);
+            }
+            catch (Exception e){
+                log.warn(e.getMessage());
+            }
+        }
+
+
 
     }
 
@@ -69,6 +97,36 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         /*По умолчанию - не определено, если не определено то отобразить, иначе - главенство внутреннего состояния
         * */
 
+        ArrayList<Task> allTasks = taskService.getAllTasks();
+
+        for (Task task:allTasks){
+            try {
+
+                NewTaskDto newTaskDto = new NewTaskDto();
+
+
+                if(task.getStatus()==TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА||
+                        task.getStatus()==TaskStatusEnum.ОЖИДАНИЕ_ДАННЫХ||
+                        task.getStatus()==TaskStatusEnum.ОЖИДАНИЕ_ИСХОДНИКОВ)
+                {
+                    newTaskDto.setInside_status(InsideTaskStatusEnum.НЕ_ОПРЕДЕЛЕНО);
+                    taskService.updateInsideTaskStatus(newTaskDto);
+                }
+
+                if(task.getStatus() == TaskStatusEnum.В_ОЧЕРЕДИ){
+                    newTaskDto.setInside_status(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
+                    taskService.updateInsideTaskStatus(newTaskDto);
+                }
+
+                if(task.getStatus() == TaskStatusEnum.УДАЛЕНА){
+                    newTaskDto.setInside_status(InsideTaskStatusEnum.УДАЛЕНА);
+                    taskService.updateInsideTaskStatus(newTaskDto);
+                }
+            }
+            catch (Exception e){
+                log.error(e.getMessage());
+            }
+        }
 
 
     }
@@ -76,6 +134,50 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
     private void mappingInside2OutsideTaskState() {
         /*По умолчанию - не определено, если не определено то отобразить, иначе - главенство внутреннего состояния
          * */
+
+        ArrayList<Task> allTasks = taskService.getAllTasks();
+
+        for (Task task:allTasks){
+            try {
+
+                NewTaskDto newTaskDto = new NewTaskDto();
+
+
+                if(task.getInside_status()==InsideTaskStatusEnum.ВЫПОЛНЕНИЕ||
+                        task.getInside_status()==InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА||
+                        task.getInside_status()==InsideTaskStatusEnum.СОЗДАН_ОБРАЗ)
+
+                {
+                    newTaskDto.setStatus(TaskStatusEnum.ВЫПОЛНЕНИЕ);
+                    taskService.updateTaskStatusByTaskId(newTaskDto);
+                }
+
+                if(task.getInside_status()==InsideTaskStatusEnum.ЗАВЕРШЕНА){
+                    newTaskDto.setStatus(TaskStatusEnum.ЗАВЕРШЕНА);
+                    taskService.updateTaskStatusByTaskId(newTaskDto);
+                }
+
+                if(task.getInside_status()==InsideTaskStatusEnum.УДАЛЕНА){
+                    newTaskDto.setStatus(TaskStatusEnum.УДАЛЕНА);
+                    taskService.updateTaskStatusByTaskId(newTaskDto);
+                }
+
+                if(task.getInside_status()==InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ){
+                    newTaskDto.setStatus(TaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
+                    taskService.updateTaskStatusByTaskId(newTaskDto);
+                }
+
+                if(task.getInside_status()==InsideTaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ){
+                    newTaskDto.setStatus(TaskStatusEnum.ОШИБКА_КОМПИЛЯЦИИ);
+                    taskService.updateTaskStatusByTaskId(newTaskDto);
+                }
+
+            }
+            catch (Exception e){
+                log.error(e.getMessage());
+            }
+        }
+
     }
 
     public void setTaskService(TaskService taskService){
@@ -94,14 +196,9 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
                     e.printStackTrace();
                 }
             };
-        }, 10000L, dispatcherPeriodMS);
+        }, 10000L, dispatcherQuantumPeriodMS);
     }
 
-    private void scanDataBase(){
-
-
-
-    }
 
     private boolean isFolderExist(String folderPath){
 
@@ -156,54 +253,8 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         return str;
     }
 
-    private ArrayList<String> bashCommand(String command, String dir) throws IOException, InterruptedException {
-
-
-        try{
-
-
-
-            Path tmpBashPath = Paths.get(dockerDirPath+"tmpRun.bash");
-            Path tmpCommandResult= Paths.get(dockerDirPath+"CommandResult.txt");
-
-            FileWriter writer = new FileWriter(tmpBashPath.toString(), false);
-            writer.write(command+"\n");
-            writer.flush();
-            writer.close();
-
-            writer = new FileWriter(tmpCommandResult.toString(), false);
-            writer.flush();
-            writer.close();
-
-            Set<PosixFilePermission> ownerWritable = PosixFilePermissions.fromString("rwxrwxrwx");
-            FileAttribute<?> permissions = PosixFilePermissions.asFileAttribute(ownerWritable);
-
-
-            Files.setPosixFilePermissions(tmpBashPath,ownerWritable);
-
-
-            ProcessBuilder pr = new ProcessBuilder();
-            pr.command(tmpBashPath.toString());
-
-            pr.redirectOutput(new File(tmpCommandResult.toString()));
-
-            Process process = pr.start();
-            process.waitFor();
-
-
-
-            log.info("Успешный запуск!");
-
-            return (ArrayList<String>) Files.readAllLines(tmpCommandResult);
-
-
-        }
-        catch (Exception e){
-            log.error(e.getMessage());
-
-            throw e;
-
-        }
+    private void unzip(final String zipFilePath, final String unzipLocation) throws IOException {
+        Process proc = Runtime.getRuntime().exec("unzip "+ zipFilePath+" -d "+unzipLocation);
     }
 
 
@@ -240,9 +291,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
     }
 
 
-    private void unzip(final String zipFilePath, final String unzipLocation) throws IOException {
-        Process proc = Runtime.getRuntime().exec("unzip "+ zipFilePath+" -d "+unzipLocation);
-    }
+
 
 
     private boolean isDockerImageExist(Long taskId) throws Exception {
@@ -253,12 +302,33 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
     }
 
+    private boolean isTaskRun(Long id) {
+        return false;
+    }
+
+
+    private void runTask(Long id) {
+        /*
+        * Запустить в докере
+        *
+        * */
+    }
+
+    private void checkTaskCompleteOrHaveTheErrors() {
+        /* Удаление из очереди, если завершена или ошибки
+        изменение внутреннего состояния
+        если завершена добавить в бд путь к выходному файлу
+        */
+    }
 
     // Основная логика диспетчера
     private void dispatcherQuantum() throws Exception {
 
 
-        ArrayList<Task> taskQueue = taskService.getTasksByStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
+       // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
+
+
+        ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
 
         for (Task task:taskQueue){
             try {
@@ -274,6 +344,8 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
                 if(isFolderExist(getTaskUnZipDir(task.getId()))){
                     dockerCreateImage(getTaskUnZipDir(task.getId()),task.getId());
+                    roundRobinTaskQueue.addLast(task);
+                    //
                 }
 
             }catch (Exception e){
@@ -282,13 +354,35 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         }
 
 
+        // Первый запуск или обошли круг
+        if(this.curQuantumAtRaundRobin ==0){
+            //Сердце диспетчера!
+
+            Task firstTask = roundRobinTaskQueue.getFirst();
+            roundRobinTaskQueue.removeFirst();
+            roundRobinTaskQueue.addLast(firstTask);
+
+            if(isDockerImageExist(firstTask.getId())){
+                if(!isTaskRun(firstTask.getId())){
+                    runTask(firstTask.getId());
+                }
+
+            }
+            else{
+                log.error("Образа задачи не существует");
+            }
+
+        }
+
+        this.curQuantumAtRaundRobin = this.curQuantumAtRaundRobin % this.quantumsAtRaundRobin;
+
+        checkTaskCompleteOrHaveTheErrors();
 
         if (taskQueue.size()!=0){
             log.info("Задача {} в очереди",taskQueue.get(0).getName());
         }
 
-
-        // Функция отображения внутренего состояния задачи на внешнее
+        mappingInside2OutsideTaskState();
 
 
     }

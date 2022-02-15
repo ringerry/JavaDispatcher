@@ -1,6 +1,7 @@
 package Ru.IVT.JWT_REST_Dispatcher.Repository;
 
 
+import Ru.IVT.JWT_REST_Dispatcher.Model.InsideTaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -40,5 +41,11 @@ public interface TaskRepositoryNT extends JpaRepository<Task, Long> {
 
     @Query(value = "SELECT t FROM Task t WHERE t.status = :status")
     ArrayList<Task> getTasksByStatus(@Param("status")TaskStatusEnum status);
+
+    @Query(value = "SELECT t FROM Task t WHERE t.inside_status = :inside_status")
+    ArrayList<Task> getTasksByInsideStatus(@Param("inside_status") InsideTaskStatusEnum inside_status);
+
+    @Query(value = "SELECT t FROM Task t")
+    ArrayList<Task> getAllTasks();
 
 }

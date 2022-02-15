@@ -2,10 +2,7 @@ package Ru.IVT.JWT_REST_Dispatcher.Service.Impl;
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
 import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
-import Ru.IVT.JWT_REST_Dispatcher.Model.Constanta;
-import Ru.IVT.JWT_REST_Dispatcher.Model.Role;
-import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
-import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
+import Ru.IVT.JWT_REST_Dispatcher.Model.*;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepository;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.TaskRepositoryNT;
 import Ru.IVT.JWT_REST_Dispatcher.Repository.UserRepository;
@@ -334,11 +331,52 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public void updateTaskInsideStatus(NewTaskDto newTaskDto, Long userId) throws Exception {
+    public void updateTaskStatusByTaskId(NewTaskDto newTaskDto) throws Exception {
+        try{
+
+            if (isTaskExist(newTaskDto)){
+                taskRepository.updateTaskStatusByTaskId(newTaskDto.getId(),newTaskDto.getStatus());
+
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public void updateInsideTaskStatus(NewTaskDto newTaskDto) throws Exception {
+        try{
+
+            if (isTaskExist(newTaskDto)){
+                taskRepository.updateInsideTaskStatusByTaskId(newTaskDto.getId(),newTaskDto.getInside_status());
+
+            }
+            else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
+
+
+        }
+        catch (TaskDoesNotExistException e){
+            throw e;
+        }
+        catch (Exception e){
+            throw e;
+        }
+    }
+
+    @Override
+    public void updateInsideTaskStatusWithUserId(NewTaskDto newTaskDto, Long userId) throws Exception {
         try{
 
             if (isUserHaveTask(newTaskDto, userId)){
-                taskRepository.updateTaskInsideStatusById(newTaskDto.getId(),newTaskDto.getStatus(),userId);
+                taskRepository.updateInsideTaskStatusWithUserId(newTaskDto.getId(),
+                        newTaskDto.getInside_status(),userId);
 
             }
             else {throw new TaskDoesNotExistException("Задачи "+newTaskDto.getId()+" не существует");}
@@ -415,6 +453,18 @@ public class TaskServiceImpl implements TaskService {
 
     }
 
+    @Override
+    public ArrayList<Task> getTasksByInsideStatus(InsideTaskStatusEnum insideTaskStatus) {
+
+        return taskRepositoryNT.getTasksByInsideStatus(insideTaskStatus);
+
+    }
+
+    @Override
+    public ArrayList<Task> getAllTasks() {
+        return taskRepositoryNT.getAllTasks();
+    }
+
     private boolean isUserHaveTask(NewTaskDto newTaskDto, Long userId) {
         boolean UserHaveTask = false;
 //        taskRepositoryNT.u
@@ -426,6 +476,17 @@ public class TaskServiceImpl implements TaskService {
             }
         }
         return UserHaveTask;
+    }
+
+    private boolean isTaskExist(NewTaskDto newTaskDto) {
+
+        Task task = taskRepositoryNT.getTaskById(newTaskDto.getId());
+
+        if(task!=null){
+            return true;
+        }
+        return false;
+
     }
 
 }
