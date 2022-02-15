@@ -8,6 +8,7 @@ import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.io.*;
@@ -21,6 +22,9 @@ import java.util.regex.Pattern;
 /**
  * Диспетчеризация, алгоритмы приоритетов
  * @author Меньшиков Артём
+ *
+ * Соглашиения: UUID - по папке исходников
+ *
  * */
 /*
 Все дейстия в task_in_run делает этот DispatcherEngine класс
@@ -29,12 +33,15 @@ import java.util.regex.Pattern;
 @Slf4j
 public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
+
+
     private TaskService taskService;
 
     private Long dispatcherQuantumPeriodMS;
     private Integer quantumsAtRaundRobin;
     private Integer curQuantumAtRaundRobin;
     private LinkedList<Task> roundRobinTaskQueue;
+    private Task roundRobinCurrenTask;
 
     private final Timer myTimer; // Создаем таймер
 
@@ -88,6 +95,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             }
         }
 
+        roundRobinCurrenTask = null;
 
 
     }
@@ -297,20 +305,31 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
     private boolean isDockerImageExist(Long taskId) throws Exception {
         Task task = taskService.getTaskById(taskId);
 
+        ArrayList<String> comandResult = BashTools.bashCommand("echo 'q'||sudo -S docker inspect"+
+                getUUIDFromFileName(task.getSource_file_name()),"");
+
+        try {
+            JSONObject jsonObject = new JSONObject(comandResult.get(0));
+
+
+
+        }catch (Exception err){
+            log.error(err.getMessage());
+        }
 
         return true;
 
     }
 
-    private boolean isTaskRun(Long id) {
+    private boolean isTaskRun(Long taskId) {
         return false;
     }
 
 
-    private void runTask(Long id) {
+    private void runTask(Long taskId) {
         /*
         * Запустить в докере
-        *
+        * или снять с паузы
         * */
     }
 
@@ -321,14 +340,20 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         */
     }
 
+    private void pauseTask(Long taskId) {
+    }
+
+
     // Основная логика диспетчера
     private void dispatcherQuantum() throws Exception {
 
 
-       // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
+
+        // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
 
 
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
+        isDockerImageExist(taskQueue.get(0).getId());
 
         for (Task task:taskQueue){
             try {
@@ -353,6 +378,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             }
         }
 
+        checkTaskCompleteOrHaveTheErrors();
 
         // Первый запуск или обошли круг
         if(this.curQuantumAtRaundRobin ==0){
@@ -360,11 +386,22 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
             Task firstTask = roundRobinTaskQueue.getFirst();
             roundRobinTaskQueue.removeFirst();
-            roundRobinTaskQueue.addLast(firstTask);
+//            roundRobinTaskQueue.addLast(firstTask);
 
             if(isDockerImageExist(firstTask.getId())){
                 if(!isTaskRun(firstTask.getId())){
+                    if(roundRobinCurrenTask==null){
+                        roundRobinCurrenTask=firstTask;
+                    }
+                    else{
+                        pauseTask(roundRobinCurrenTask.getId());
+                        roundRobinTaskQueue.addLast(roundRobinCurrenTask);
+                        roundRobinCurrenTask = firstTask;
+                    }
                     runTask(firstTask.getId());
+                }
+                else {
+                    log.error("Задача уже запущена");
                 }
 
             }
@@ -376,7 +413,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
         this.curQuantumAtRaundRobin = this.curQuantumAtRaundRobin % this.quantumsAtRaundRobin;
 
-        checkTaskCompleteOrHaveTheErrors();
+
 
         if (taskQueue.size()!=0){
             log.info("Задача {} в очереди",taskQueue.get(0).getName());
