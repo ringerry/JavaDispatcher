@@ -118,6 +118,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             try {
 
                 NewTaskDto newTaskDto = new NewTaskDto();
+                newTaskDto.setId(task.getId());
 
 
                 if(task.getStatus()==TaskStatusEnum.ОЖИДАНИЕ_ЗАПУСКА||
@@ -156,7 +157,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             try {
 
                 NewTaskDto newTaskDto = new NewTaskDto();
-
+                newTaskDto.setId(task.getId());
 
                 if(task.getInside_status()==InsideTaskStatusEnum.ВЫПОЛНЕНИЕ||
                         task.getInside_status()==InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА||
@@ -312,23 +313,24 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
     private boolean isDockerImageExist(Long taskId) throws Exception {
         Task task = taskService.getTaskById(taskId);
 
-        ArrayList<String> comandResult = BashTools.bashCommand("echo 'q'||sudo -S docker inspect"+
+        ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .Config}}' $INSTANCE_ID "+
                 getUUIDFromFileName(task.getSource_file_name()),"");
 
-        try {
-            JSONObject jsonObject = new JSONObject(comandResult.get(0));
-
-
-
-        }catch (Exception err){
-            log.error(err.getMessage());
+        if(!commandResult.get(0).equals("")){
+            return true;
         }
 
-        return true;
+        return false;
 
     }
 
-    private boolean isTaskRun(Long taskId) {
+    private boolean isTaskRun(Long taskId) throws Exception {
+
+        Task task = taskService.getTaskById(taskId);
+
+        ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .Config}}' $INSTANCE_ID "+
+                getUUIDFromFileName(task.getSource_file_name()),"");
+
         return false;
     }
 
@@ -338,6 +340,8 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         * Запустить в докере
         * или снять с паузы
         * */
+
+
     }
 
     private void checkTaskCompleteOrHaveTheErrors() {
@@ -360,7 +364,12 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
 
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
-//        isDockerImageExist(taskQueue.get(0).getId());
+
+        if(taskQueue.size()!=0){
+
+            isDockerImageExist(14L);
+        }
+
 
         for (Task task:taskQueue){
             try {
@@ -392,7 +401,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             //Сердце диспетчера!
 
             Task firstTask = roundRobinTaskQueue.getFirst();
-            roundRobinTaskQueue.removeFirst();
+
 //            roundRobinTaskQueue.addLast(firstTask);
 
             if(isDockerImageExist(firstTask.getId())){
@@ -405,6 +414,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
                         roundRobinTaskQueue.addLast(roundRobinCurrenTask);
                         roundRobinCurrenTask = firstTask;
                     }
+                    roundRobinTaskQueue.removeFirst();
                     runTask(firstTask.getId());
                 }
                 else {
@@ -427,6 +437,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
         }
 
         mappingInside2OutsideTaskState();
+        mappingOutside2InsideTaskState();
 
 
     }
