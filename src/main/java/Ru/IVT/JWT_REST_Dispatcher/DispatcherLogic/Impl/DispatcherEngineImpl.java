@@ -335,11 +335,18 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
     }
 
 
-    private void runTask(Long taskId) {
+    private void runTask(Long taskId) throws Exception {
         /*
         * Запустить в докере
         * или снять с паузы
         * */
+
+        Task task = taskService.getTaskById(taskId);
+
+        ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker run "+
+                getUUIDFromFileName(task.getSource_file_name()),"");
+
+
 
 
     }
@@ -365,10 +372,10 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
 
-        if(taskQueue.size()!=0){
-
-            isDockerImageExist(14L);
-        }
+//        if(taskQueue.size()!=0){
+//
+//            isDockerImageExist(14L);
+//        }
 
 
         for (Task task:taskQueue){
