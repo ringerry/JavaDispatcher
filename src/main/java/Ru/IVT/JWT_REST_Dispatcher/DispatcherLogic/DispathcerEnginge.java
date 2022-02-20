@@ -8,4 +8,6 @@ public interface DispathcerEnginge {
     Timer getMyTimer();
 
     void init();
+
+    String getConsoleOutput(Long taskId) throws Exception;
 }

@@ -2,6 +2,7 @@ package Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl;
 
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
+import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.DispathcerEnginge;
 import Ru.IVT.JWT_REST_Dispatcher.Model.InsideTaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
@@ -25,7 +26,7 @@ import java.util.regex.Pattern;
  * Диспетчеризация, алгоритмы приоритетов
  * @author Меньшиков Артём
  *
- * Соглашиения: UUID - по папке исходников
+ * Соглашения: UUID - по папке исходников
  *
  * */
 /*
@@ -34,7 +35,7 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Component
-public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
+public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
 
@@ -207,7 +208,7 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
             public void run() {
                log.info("Квант диспетчера");
                 try {
-                    dispatcherQuantum();
+//                    dispatcherQuantum();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -452,4 +453,25 @@ public class DispatcherEngineImpl /*implements DispathcerEnginge*/ {
 
 
 
+    @Override
+    public Timer getMyTimer() {
+        return null;
+    }
+
+    @Override
+    public void init() {
+
+    }
+
+    @Override
+    public String getConsoleOutput(Long taskId) throws Exception {
+
+        Task task = taskService.getTaskById(taskId);
+
+        ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker logs "+
+                getUUIDFromFileName(task.getSource_file_name()),"");
+
+
+        return null;
+    }
 }

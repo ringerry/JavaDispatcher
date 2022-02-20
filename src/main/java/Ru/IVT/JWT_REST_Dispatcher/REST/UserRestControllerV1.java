@@ -107,6 +107,308 @@ public class UserRestControllerV1 {
         return new ResponseEntity<>("Здравствуйте!", HttpStatus.OK);
     }
 
+    private Object getHeadersInfo(){
+
+        HashMap<String, Object> method_headers = new HashMap<>(), meth_param = new HashMap<>();
+
+        meth_param.put("Тип","Строка");
+        meth_param.put("Обязательный","Истина");
+        meth_param.put("Описание","Токен");
+        meth_param.put("Шаблон","Bearer_<токен>");
+        method_headers.put("Authorization",meth_param.clone());
+        return method_headers;
+    }
+
+    private Object getParamDescription(String type, boolean required, String description){
+        HashMap<String, Object>  meth_param = new HashMap<>();
+
+        meth_param.put("Тип",type);
+        meth_param.put("Обязательный",required ? "Истина":"Ложь");
+        meth_param.put("Описание",description);
+        return meth_param;
+    }
+
+    private Object getUserURLInfo(String type,Object headers, Object body,String outputType, String description){
+        HashMap<String, Object> method_info= new HashMap<>();
+
+        method_info.put("Заголовки",headers);
+        method_info.put("Описание",description);
+        method_info.put("Тип",type);
+        method_info.put("Параметры тела",body==null?"Не требуются":body);
+
+        method_info.put("Тип ответа" ,outputType);
+
+        return method_info;
+    }
+
+    private Object getUserURLInfo(String type,Object headers, Object body, String description){
+        HashMap<String, Object> method_info= new HashMap<>();
+
+        method_info.put("Заголовки",headers);
+        method_info.put("Описание",description);
+        method_info.put("Тип",type);
+        method_info.put("Параметры тела",body==null?"Не требуются":body);
+        return method_info;
+    }
+
+    @GetMapping(value = "documentation")
+    public ResponseEntity
+    documentation() throws Exception {
+
+        try{
+
+            String msg = "Данное удаленное приложение поддерживает контейнерную обработку задач на Python и " +
+                    "TypeScript. Исходники и данные могут пуступать в обработку независимо.";
+            Map<Object,Object> response = new HashMap<>();
+
+            response.put("Описание сервиса",msg);
+
+            msg="Приложение на Python должно содержать точку входа - файл 'Main.py'; приложение на TypeScript " +
+                    "должно содеражать точку входа - файл 'Main.ts', регистр важен. " +
+                    "Формат исходников и данных - zip архив." +
+                    "Данное приложение для каждой запущенной задачи распаковывает zip архив с исходниками в опредленную " +
+                    "папку, в корне этой папки как раз и должен находится файл Main.py(Main.ts); а также в эту же папку," +
+                    " т.е. в одну папку с Main.py(Main.ts) распаковывются данные. Таким образом, перед запуском " +
+                    "пользовательской задачи в некоторой папке находится распакованный zip архив с исходниками, " +
+                    "содеражщий Main.py(Main.ts) и входные данные. Выходные файлы программы должны помещатся в папку " +
+                    "./Выход. По успешному завершению задачи пользователь получает zip архив папки ./Выход.";
+            response.put("Требования",msg);
+
+            msg="Доступные методы";
+
+
+            HashMap<String, Object> methods = new HashMap<>(), method_params=new HashMap<>();
+                     ;
+
+
+            methods.put("/api/documentation",getUserURLInfo("GET",getHeadersInfo(),null,"JSON" ,
+                    "Справка."));
+
+
+
+            methods.put("/api/task_list",getUserURLInfo("GET",getHeadersInfo(),null,"JSON",
+                    "Список всех задач."));
+
+
+            method_params = new HashMap<>();
+            method_params.put("TaskName",getParamDescription(
+                    "Строка",
+                    true,
+                    "Имя задачи"
+            ));
+            method_params.put("TaskId",getParamDescription(
+                    "Целое",
+                    true,
+                    "Id задачи"
+            ));
+            methods.put("/api/task_output",getUserURLInfo("GET",getHeadersInfo(),method_params,
+                    "Zip-архив",
+                    "Выходные файлы задачи. Zip-архив."));
+
+
+
+
+            method_params.put("TaskName",getParamDescription(
+                    "Строка",
+                    true,
+                    "Имя задачи"
+            ));
+            method_params.put("CanNameDuplicate",getParamDescription(
+                    "Логический",
+                    true,
+                    "Истина - имена задач могут повторятся, ложь - имя задачи должно быть уникальным."
+            ));
+            method_params.put("TaskSourcesFile",getParamDescription(
+                    "Zip-архив",
+                    true,
+                    "Zip-архив с исходниками на Python или TypeScript, корень архива содерижт точку " +
+                            "входа Main.py(Main.ts)."
+            ));
+            method_params.put("TaskDataFile",getParamDescription(
+                    "Zip-архив",
+                    true,
+                    "Zip-архив с данными для задачи"
+            ));
+            methods.put("/api/add_task",getUserURLInfo("POST",getHeadersInfo(),method_params,
+                    "Добавление задачи"));
+
+
+
+            method_params = new HashMap<>();
+            method_params.put("TaskName",getParamDescription(
+                    "Строка",
+                    true,
+                    "Имя задачи"
+            ));
+            method_params.put("TaskId",getParamDescription(
+                    "Целое",
+                    false,
+                    "Если не указывать id задачи - создастся новая, иначе, если указать её id, " +
+                            "то к существующей задаче добавятся(обновятся) исходники."
+            ));
+            method_params.put("CanNameDuplicate",getParamDescription(
+                    "Логический",
+                    true,
+                    "Истина - имена задач могут повторятся, ложь - имя задачи должно быть уникальным."
+            ));
+            method_params.put("TaskSourcesFile",getParamDescription(
+                    "Zip-архив",
+                    true,
+                    "Zip-архив с исходниками на Python или TypeScript, корень архива содерижт точку " +
+                            "входа Main.py(Main.ts)."
+            ));
+            methods.put("/api/add_sources",getUserURLInfo("POST",getHeadersInfo(),method_params,
+                    "Добавление или обновление исходников"));
+
+
+
+
+            method_params = new HashMap<>();
+            method_params.put("TaskName",getParamDescription(
+                    "Строка",
+                    true,
+                    "Имя задачи"
+            ));
+            method_params.put("TaskId",getParamDescription(
+                    "Целое",
+                    false,
+                    "Если не указывать id задачи - создастся новая, иначе, если указать её id, " +
+                            "то к существующей задаче добавятся(обновятся) исходники."
+            ));
+            method_params.put("CanNameDuplicate",getParamDescription(
+                    "Логический",
+                    true,
+                    "Истина - имена задач могут повторятся, ложь - имя задачи должно быть уникальным."
+            ));
+            method_params.put("TaskDataFile",getParamDescription(
+                    "Zip-архив",
+                    true,
+                    "Zip-архив с данными для задачи"
+            ));
+            methods.put("/api/add_data",getUserURLInfo("POST",getHeadersInfo(),method_params,
+                    "Добавление или обновление данных к задаче"));
+
+
+
+            method_params = new HashMap<>();
+            method_params.put("TaskName",getParamDescription(
+                    "Строка",
+                    true,
+                    "Имя задачи"
+            ));
+            method_params.put("TaskId",getParamDescription(
+                    "Целое",
+                    true,
+                    "Id задачи"
+            ));
+            methods.put("/api/task_status",getUserURLInfo("POST",getHeadersInfo(),method_params,
+                    "Получение статуса задачи."));
+
+
+
+            method_params = new HashMap<>();
+            method_params.put("TaskName",getParamDescription(
+                    "Строка",
+                    true,
+                    "Имя задачи"
+            ));
+            method_params.put("TaskId",getParamDescription(
+                    "Целое",
+                    true,
+                    "Id задачи"
+            ));
+            methods.put("/api/run_task",getUserURLInfo("POST",getHeadersInfo(),method_params,
+                    "Запуск задачи. Пока задача не запущена, она не будет выполнятся, даже если " +
+                            "на сервере будут и исходника, и данные."));
+
+
+
+            method_params = new HashMap<>();
+            method_params.put("TaskName",getParamDescription(
+                    "Строка",
+                    true,
+                    "Имя задачи"
+            ));
+            method_params.put("TaskId",getParamDescription(
+                    "Целое",
+                    true,
+                    "Id задачи"
+            ));
+            methods.put("/api/delete_task",getUserURLInfo("POST",getHeadersInfo(),method_params,
+                    "Удаление задачи."));
+
+
+
+            response.put("Доступные методы",methods);
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+    @GetMapping(value = "task_list")
+    public ResponseEntity
+    taskList(@RequestHeader("Authorization") String token) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+            User User1 = getUserByToken(token);
+
+            List<Task> taskList = taskService.getUserTasks(User1.getId());
+
+            // подготовка в json
+
+            String msg = "Список всех задач ";
+            Map<Object,Object> response = new HashMap<>();
+
+            response.put("Описание",msg);
+            response.put("Задачи",taskList);
+//                response.put("id_задачи",task.getId());
+
+            return ResponseEntity.ok(response);
+
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
+
+    @GetMapping(value = "task_output",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity
+    getTaskOutput(@RequestHeader("Authorization") String token,
+                  @RequestParam(value = "TaskName") String TaskName,
+                  @RequestParam(value = "TaskId") Long TaskId) throws Exception {
+
+
+        // Проверка на повторяющиеся задачи
+        try{
+            User User1 = getUserByToken(token);
+
+            List<Task> taskList = taskService.getUserTasks(User1.getId());
+
+            // подготовка в json
+
+            Map<Object,Object> response = new HashMap<>();
+            String msg = "Проверка 888.";
+
+            response.put("Описание",msg);
+
+
+            return ResponseEntity.ok(response);
+
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+
+    }
+
     @PostMapping(value = "add_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity
         addTask(@RequestHeader("Authorization") String token,
@@ -291,115 +593,6 @@ public class UserRestControllerV1 {
 
     }
 
-
-
-    @PostMapping(value = "update_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity
-    updateTask(@RequestHeader("Authorization") String token,
-            @RequestParam(value = "TaskName") String TaskName,
-            @RequestParam(value = "TaskId") Long TaskId,
-            @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile,
-            @RequestParam("TaskDataFile")MultipartFile TaskDataFile) throws Exception {
-
-
-        // Проверка на повторяющиеся задачи
-        try{
-
-            User User1 = getUserByToken(token);
-
-            Task task = taskService.getTaskById(TaskId);
-
-            if (isCanUpdateTask(task)){
-
-                return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile,
-                        TaskDataFile,User1.getId());
-            }
-            else {
-
-                String msg = "Изменять задачу разрешено, если она находится в одном из состояний:"+
-                                getWhiteTaskUpdateList();
-
-                Map<Object,Object> response = new HashMap<>();
-                response.put("Описание",msg);
-
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
-            }
-
-
-        }
-        catch (Exception exc){
-            throw exc;
-        }
-
-    }
-
-
-    @PostMapping(value = "update_sources",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity
-    updateSources(@RequestHeader("Authorization") String token,
-               @RequestParam(value = "TaskName") String TaskName,
-               @RequestParam(value = "TaskId") Long TaskId,
-               @RequestParam("TaskSourcesFile")MultipartFile TaskSourcesFile) throws Exception {
-
-
-        // Проверка на повторяющиеся задачи
-        try{
-            User User1 = getUserByToken(token);
-            return getResponseEntityUpdateTask(token, TaskName,TaskId, TaskSourcesFile, null, User1.getId());
-        }
-        catch (Exception exc){
-            throw exc;
-        }
-
-    }
-
-    @PostMapping(value = "update_data",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity
-    updateData(@RequestHeader("Authorization") String token,
-                  @RequestParam(value = "TaskName") String TaskName,
-                  @RequestParam(value = "TaskId") Long TaskId,
-                  @RequestParam("TaskDataFile")MultipartFile TaskDataFile) throws Exception {
-
-
-        // Проверка на повторяющиеся задачи
-        try{
-            User User1 = getUserByToken(token);
-            return getResponseEntityUpdateTask(token, TaskName,TaskId, null, TaskDataFile, User1.getId());
-        }
-        catch (Exception exc){
-            throw exc;
-        }
-
-    }
-
-    @PostMapping(value = "task_list",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity
-    taskList(@RequestHeader("Authorization") String token) throws Exception {
-
-
-        // Проверка на повторяющиеся задачи
-        try{
-            User User1 = getUserByToken(token);
-
-            List<Task> taskList = taskService.getUserTasks(User1.getId());
-
-            // подготовка в json
-
-            String msg = "Список всех задач ";
-            Map<Object,Object> response = new HashMap<>();
-
-            response.put("Описание",msg);
-            response.put("Задачи",taskList);
-//                response.put("id_задачи",task.getId());
-
-            return ResponseEntity.ok(response);
-
-        }
-        catch (Exception exc){
-            throw exc;
-        }
-
-    }
 
     @PostMapping(value = "task_status",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity
