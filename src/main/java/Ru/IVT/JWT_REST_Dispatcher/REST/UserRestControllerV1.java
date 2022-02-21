@@ -14,11 +14,16 @@ import Ru.IVT.JWT_REST_Dispatcher.Service.UserService;
 import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
 import liquibase.util.file.FilenameUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
@@ -31,6 +36,9 @@ import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
+
+
+
 
 /**
  * REST controller user connected requestst.
@@ -65,46 +73,7 @@ public class UserRestControllerV1 {
     @GetMapping(value = "hello")
     public ResponseEntity<String> responseHello(){
 
-////        dispathcerEnginge.getMyTimer().cancel();
-//
-//        try{
-////            ProcessBuilder pr = new ProcessBuilder();
-////            pr.command("/home/artem/bash_java.bash");
-////            pr.start();
-//
-////            chmod ugo+x file2.bash
-//
-//
-//            Path path = Paths.get("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
-//
-//            Set<PosixFilePermission> ownerWritable = PosixFilePermissions.fromString("rwxrwxrwx");
-//            FileAttribute<?> permissions = PosixFilePermissions.asFileAttribute(ownerWritable);
-//            Files.createFile(path, permissions);
-//
-//
-//            //
-//        try(FileWriter writer = new FileWriter("/home/artem/Dispatcher_files/DockerTmp/file3.bash", false))
-//        {
-//            // запись всей строки
-////            String text = "Доброе утро!";
-//            writer.write("mkdir ./Привет\n");
-//
-//            writer.flush();
-//        }
-//        catch (Exception e ){log.error(e.getMessage());}
-//
-//            ProcessBuilder pr = new ProcessBuilder();
-//            pr.command("/home/artem/Dispatcher_files/DockerTmp/file3.bash");
-//            pr.start();
-//
-//            log.info("Успешный запуск!");
-//
-//        }
-//        catch (IOException e){
-//            log.error(e.getMessage());
-//        }
-
-        return new ResponseEntity<>("Здравствуйте!", HttpStatus.OK);
+        return new ResponseEntity<>("Здравствуйте!"+taskService.getTest(), HttpStatus.OK);
     }
 
     private Object getHeadersInfo(){
@@ -379,35 +348,51 @@ public class UserRestControllerV1 {
     }
 
 
-    @GetMapping(value = "task_output",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity
-    getTaskOutput(@RequestHeader("Authorization") String token,
-                  @RequestParam(value = "TaskName") String TaskName,
-                  @RequestParam(value = "TaskId") Long TaskId) throws Exception {
-
-
+    @GetMapping(
+            value = "task_output",
+            produces = MediaType.APPLICATION_OCTET_STREAM_VALUE
+    )
+    @ResponseBody
+    public ResponseEntity<Resource> getTaskOutput(@RequestHeader("Authorization") String token,
+                                                  @RequestParam(value = "TaskName") String TaskName,
+                                                  @RequestParam(value = "TaskId") Long TaskId) throws IOException {
         // Проверка на повторяющиеся задачи
         try{
-            User User1 = getUserByToken(token);
 
-            List<Task> taskList = taskService.getUserTasks(User1.getId());
+            String filename = "/home/artem/Dispatcher_files/Данные_задача_1.39f3d1fc-3202-42e4-8671-0d9b0db597ed.zip";
 
-            // подготовка в json
+            Path file = Paths.get(filename);
+            Resource resource = new UrlResource(file.toUri());
+            if (resource.exists() || resource.isReadable()) {
+//                return resource;
+            }
+            else {
+                throw new FileNotFoundException(
+                        "Could not read file: " + filename);
+            }
 
-            Map<Object,Object> response = new HashMap<>();
-            String msg = "Проверка 888.";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + resource.getFilename() + "\"")
+                    .body(resource);
 
-            response.put("Описание",msg);
+//            Path path = Paths.get("/home/artem/Dispatcher_files/Данные_задача_1.39f3d1fc-3202-42e4-8671-0d9b0db597ed.zip");
 
 
-            return ResponseEntity.ok(response);
+//            File initialFile = new File("/home/artem/Dispatcher_files/Данные_задача_1.39f3d1fc-3202-42e4-8671-0d9b0db597ed.zip");
+//            InputStream targetStream = new FileInputStream(initialFile);
+//
+////            InputStream in = UserRestControllerV1.class.getResourceAsStream("/home/artem/Dispatcher_files/Данные_задача_1.39f3d1fc-3202-42e4-8671-0d9b0db597ed.zip");
+//            return IOUtils.toByteArray(targetStream);
+
+//            return ResponseEntity.ok(null);
 
         }
         catch (Exception exc){
             throw exc;
         }
-
     }
+
 
     @PostMapping(value = "add_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity

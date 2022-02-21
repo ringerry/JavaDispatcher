@@ -50,4 +50,8 @@ public interface TaskService {
     ArrayList<Task> getTasksByInsideStatus(InsideTaskStatusEnum insideTaskStatus);
     ArrayList<Task> getAllTasks();
 
+    void setTest(String test);
+
+    String getTest();
+
 }

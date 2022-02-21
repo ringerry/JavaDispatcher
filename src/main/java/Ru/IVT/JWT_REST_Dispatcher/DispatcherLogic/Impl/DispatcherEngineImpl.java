@@ -202,11 +202,14 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
 
+    private Long counter = Long.valueOf(0);
+
     private void startMainTimer() {
         myTimer.schedule(new TimerTask() { // Определяем задачу
             @Override
             public void run() {
                log.info("Квант диспетчера");
+//               taskService.setTest((counter=counter+1).toString());
                 try {
 //                    dispatcherQuantum();
                 } catch (Exception e) {

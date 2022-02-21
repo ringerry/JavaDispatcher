@@ -465,6 +465,18 @@ public class TaskServiceImpl implements TaskService {
         return taskRepositoryNT.getAllTasks();
     }
 
+    private String test;
+
+    @Override
+    public void setTest(String test){
+        this.test = test;
+    }
+
+    @Override
+    public String getTest() {
+        return this.test;
+    }
+
     private boolean isUserHaveTask(NewTaskDto newTaskDto, Long userId) {
         boolean UserHaveTask = false;
 //        taskRepositoryNT.u
