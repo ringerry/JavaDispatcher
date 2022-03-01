@@ -695,44 +695,25 @@ public class UserRestControllerV1 {
         // Проверка на повторяющиеся задачи
         try{
 
-
-
             User User1 = getUserByToken(token);
 
-            NewTaskDto newTaskDto = new NewTaskDto();
-            newTaskDto.setId(TaskId);
-            newTaskDto.setStatus(TaskStatusEnum.УДАЛЕНА);
+            if(dispathcerEnginge.delTask(getUserByToken(token).getId(),TaskId)){
 
+                Map<Object,Object> response = new HashMap<>();
+                String msg = "Задача удалена";
+                response.put("Описание",msg);
+                response.put("Id_задачи",TaskId);
 
-            // Удалить все папки и файлы данной задачи
+                return ResponseEntity.ok(response);
+            }
+            else{
+                Map<Object,Object> response = new HashMap<>();
+                String msg = "Задачу невозоможно удалить";
+                response.put("Описание",msg);
+                response.put("Id_задачи",TaskId);
 
-            taskService.updateTaskStatus(newTaskDto,User1.getId());
-
-            Task task = taskService.getTaskById(TaskId,User1.getId());
-
-
-
-
-            String taskFolder = taskService.getUnzipDirById(TaskId,User1.getId());
-
-
-            BashTools.bashCommand("echo 'q' |  sudo -S rm -R "+taskFolder,"");
-
-            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getSource_file_name(),"");
-            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getData_file_name(),"");
-//            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getResult_file(),"");
-
-            taskService.deleteTask(newTaskDto,User1.getId());
-
-
-            Map<Object,Object> response = new HashMap<>();
-
-
-            String msg = "Задача удалена";
-            response.put("Описание",msg);
-            response.put("Id_задачи",TaskId);
-
-            return ResponseEntity.ok(response);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+            }
 
         }
         catch (TaskDoesNotExistException e ){

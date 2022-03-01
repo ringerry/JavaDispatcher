@@ -491,10 +491,35 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
     @Override
-    public boolean delTask(Long taskId) {
+    public boolean delTask(Long UserId, Long taskId) throws Exception {
 
         try{
-            BashTools.bashCommand("echo 'q'|sudo -S docker rmi ","");
+            NewTaskDto newTaskDto = new NewTaskDto();
+
+            newTaskDto.setId(taskId);
+            newTaskDto.setStatus(TaskStatusEnum.УДАЛЕНА);
+
+
+            // Удалить все папки и файлы данной задачи
+
+            taskService.updateTaskStatus(newTaskDto,UserId);
+
+            Task task = taskService.getTaskById(taskId,UserId);
+
+
+            String taskFolder = taskService.getUnzipDirById(taskId,UserId);
+            String taskUUID = getUUIDFromFileName(taskFolder);
+
+
+            BashTools.bashCommand("echo 'q' |  sudo -S rm -R "+taskFolder,"");
+
+            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getSource_file_name(),"");
+            BashTools.bashCommand("echo 'q' |  sudo -S rm "+task.getData_file_name(),"");
+
+            BashTools.bashCommand("echo 'q'|sudo -S docker rmi "+taskUUID,"");
+
+            taskService.deleteTask(newTaskDto,UserId);
+
             return true;
         }
         catch (Exception e){
