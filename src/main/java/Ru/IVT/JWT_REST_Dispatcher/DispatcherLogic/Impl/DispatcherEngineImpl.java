@@ -37,14 +37,13 @@ import java.util.regex.Pattern;
 @Component
 public class DispatcherEngineImpl implements DispathcerEnginge {
 
-
-
     private TaskService taskService;
 
     private Long dispatcherQuantumPeriodMS;
     private Integer quantumsAtRaundRobin;
     private Integer curQuantumAtRaundRobin;
     private LinkedList<Task> roundRobinTaskQueue;
+    private HashMap<Long,LinkedList<Task>> UsersQueues;
     private Task roundRobinCurrenTask;
 
     private final Timer myTimer; // Создаем таймер
@@ -61,6 +60,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         this.quantumsAtRaundRobin = 7;
         this.curQuantumAtRaundRobin = 0;
         this.roundRobinTaskQueue = new LinkedList<>();
+        this.UsersQueues = new HashMap<>();
         this.myTimer = new Timer();
         startMainTimer();
 
@@ -71,7 +71,6 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         mappingOutside2InsideTaskState();
         initTaskQueue();
 
-
        dockerDirPath = "/home/artem/Dispatcher_files/DockerTmp/";
 
     }
@@ -79,6 +78,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     private void initTaskQueue() {
 
 
+        // На случай остановки сервера
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
 
 
@@ -247,11 +247,17 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             File file = new File(dir2UpZip);
             file.mkdir();
 
+
+            file = new File(dir2UpZip+"/Выход");
+            file.mkdir();
+
             unzip(sourcesPath,dir2UpZip);
             unzip(dataPath,dir2UpZip/*+"/Input"*/);
 
             int a = 1;
         }
+
+
 
 
     }
@@ -275,6 +281,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     private void unzip(final String zipFilePath, final String unzipLocation) throws IOException {
         Process proc = Runtime.getRuntime().exec("unzip "+ zipFilePath+" -d "+unzipLocation);
+    }
+
+
+    // Создаётся автоматически, при заверешении задачи
+    private void zip(final String zipFilePath, final String folderPath) throws IOException {
+        Process proc = Runtime.getRuntime().exec("zip -r "+ zipFilePath+" "+folderPath);
     }
 
 
@@ -476,5 +488,18 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
         return null;
+    }
+
+    @Override
+    public boolean delTask(Long taskId) {
+
+        try{
+            BashTools.bashCommand("echo 'q'|sudo -S docker rmi ","");
+            return true;
+        }
+        catch (Exception e){
+            e.printStackTrace();
+            return false;
+        }
     }
 }

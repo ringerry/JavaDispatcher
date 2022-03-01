@@ -2,6 +2,7 @@ package Ru.IVT.JWT_REST_Dispatcher.REST;
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
 import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
+import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.DispathcerEnginge;
 import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl.DispatcherEngineImpl;
 import Ru.IVT.JWT_REST_Dispatcher.JwtDispatcherApplication;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
@@ -56,18 +57,18 @@ public class UserRestControllerV1 {
 
     private final UserService userService;
     private final TaskService taskService;
-    private DispatcherEngineImpl dispathcerEnginge;
-//    private final DispathcerProvider dispathcerProvider;
+    private DispathcerEnginge dispathcerEnginge;
 
     @Value("${local.paths.save.taskSources}")
     private String taskUploadPath;
 
     @Autowired
-    public UserRestControllerV1(UserService userService, TaskService taskService) {
+    public UserRestControllerV1(UserService userService, TaskService taskService,
+                                DispathcerEnginge dispathcerEnginge) {
         this.userService = userService;
         this.taskService = taskService;
-//        this.dispathcerProvider = dispathcerProvider;
-//        this.dispathcerEnginge = JwtDispatcherApplication.getDispatcherEngine();
+
+        this.dispathcerEnginge = dispathcerEnginge;
     }
 
     @GetMapping(value = "hello")
@@ -693,6 +694,9 @@ public class UserRestControllerV1 {
 
         // Проверка на повторяющиеся задачи
         try{
+
+
+
             User User1 = getUserByToken(token);
 
             NewTaskDto newTaskDto = new NewTaskDto();

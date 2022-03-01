@@ -10,4 +10,6 @@ public interface DispathcerEnginge {
     void init();
 
     String getConsoleOutput(Long taskId) throws Exception;
+
+    boolean delTask(Long taskId);
 }
