@@ -3,13 +3,13 @@ package Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl;
 
 import Ru.IVT.JWT_REST_Dispatcher.DTO.NewTaskDto;
 import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.DispathcerEnginge;
+import Ru.IVT.JWT_REST_Dispatcher.Model.Constanta;
 import Ru.IVT.JWT_REST_Dispatcher.Model.InsideTaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
 import lombok.extern.slf4j.Slf4j;
-import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -43,7 +43,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     private Integer quantumsAtRaundRobin;
     private Integer curQuantumAtRaundRobin;
     private LinkedList<Task> roundRobinTaskQueue;
-    private HashMap<Long,LinkedList<Task>> UsersQueues;
+    private HashMap<Long,LinkedList<Task>> UserQueues;
+    private LinkedList<Task> millTaskList;
     private Task roundRobinCurrenTask;
 
     private final Timer myTimer; // Создаем таймер
@@ -60,7 +61,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         this.quantumsAtRaundRobin = 7;
         this.curQuantumAtRaundRobin = 0;
         this.roundRobinTaskQueue = new LinkedList<>();
-        this.UsersQueues = new HashMap<>();
+        this.UserQueues = new HashMap<>();
+        this.millTaskList = new LinkedList<>();
         this.myTimer = new Timer();
         startMainTimer();
 
@@ -69,24 +71,29 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         // Отображение внешнего состояния на внутреннее с разрешением противоречий.
 
         mappingOutside2InsideTaskState();
-        initTaskQueue();
+        initUserTaskQueues();
 
-       dockerDirPath = "/home/artem/Dispatcher_files/DockerTmp/";
+        dockerDirPath = "/home/artem/Dispatcher_files/DockerTmp/";
 
     }
 
-    private void initTaskQueue() {
+    private void initUserTaskQueues() {
 
 
         // На случай остановки сервера
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
 
-
         for (Task task:taskQueue){
             try {
-                roundRobinTaskQueue.addLast(task);
+
+                LinkedList<Task> UserQueue = new LinkedList<>();
+                UserQueue.add(task);
+
+                UserQueues.put(task.getUser_id(), (LinkedList<Task>) UserQueue.clone());
+
             }
             catch (Exception e){
+                e.printStackTrace();
                 log.warn(e.getMessage());
             }
         }
@@ -96,17 +103,20 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         for (Task task:taskQueue){
             try {
-                roundRobinTaskQueue.addLast(task);
+
+                LinkedList<Task> UserQueue = new LinkedList<>();
+                UserQueue.add(task);
+
+                UserQueues.put(task.getUser_id(), (LinkedList<Task>) UserQueue.clone());
+
             }
             catch (Exception e){
+                e.printStackTrace();
                 log.warn(e.getMessage());
             }
         }
 
-        roundRobinCurrenTask = null;
-
-
-    }
+     }
 
     // Отображение внешнего состояния на внутреннее с разрешением противоречий.
     private void mappingOutside2InsideTaskState() {
@@ -211,7 +221,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                log.info("Квант диспетчера");
 //               taskService.setTest((counter=counter+1).toString());
                 try {
-//                    dispatcherQuantum();
+                    dispatcherQuantum();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -382,6 +392,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     private void dispatcherQuantum() throws Exception {
 
 
+        // Полное соответсвие с БД на момент обновления
+        updateUserQueues();
+
+        updateMillTaskList();
+
+        sendQueueTaskToMill();
 
         // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
 
@@ -420,8 +436,13 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         checkTaskCompleteOrHaveTheErrors();
 
         // Первый запуск или обошли круг
-        if(this.curQuantumAtRaundRobin ==0&&roundRobinTaskQueue.size()!=0){
+        if(this.curQuantumAtRaundRobin ==0/*&&UserQueues.size()!=0*/){
             //Сердце диспетчера!
+
+            if(millTaskList.size()< Constanta.serverTasksLimit){
+                // Место на запуск есть
+                runAllNeededTaskToRunningTaskList();
+            }
 
             Task firstTask = roundRobinTaskQueue.getFirst();
 
@@ -451,6 +472,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         }
 
+        // Каждые quantumsAtRaundRobin квантов задачи сменяются
         this.curQuantumAtRaundRobin = this.curQuantumAtRaundRobin % this.quantumsAtRaundRobin;
 
 
@@ -465,7 +487,61 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
+    private void updateMillTaskList() {
+        //Проверка докера на завершения и ошибки
+    }
 
+    private void sendQueueTaskToMill() {
+
+        Integer freePositionCounter = Constanta.serverTasksLimit - millTaskList.size();
+        if(freePositionCounter>0){
+
+            if(freePositionCounter<UserQueues.size()){
+                /* Создаем список из всех первых задач очередей и вибираем самые раниие задачи,
+                * добавляем в мельницу, извлекаем из очереди, меняем внутреннее состояние
+                * */
+            }
+            else if(freePositionCounter==UserQueues.size()){
+                // из каждой очереди в место на мельнице, состояние
+            }
+            else {
+                /* freePositionCounter>UserQueues.size()
+                * Тасование: берём по одной первой задаче из каждой очереди и добавляем в мельницу, до тех пор
+                * пока вся мельница не заполнится, состояние
+                * */
+            }
+        }
+    }
+
+
+    private void updateUserQueues() {
+
+        // За время работы задачи могли удалить, поэтому каждый раз приводим в соответсвие с состоянием из БД
+        UserQueues = new HashMap<>();
+
+        ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
+
+        for (Task task:taskQueue){
+            try {
+
+                LinkedList<Task> UserQueue = new LinkedList<>();
+                UserQueue.add(task);
+
+                UserQueues.put(task.getUser_id(), (LinkedList<Task>) UserQueue.clone());
+
+            }
+            catch (Exception e){
+                e.printStackTrace();
+                log.warn(e.getMessage());
+            }
+        }
+
+
+    }
+
+    private void runAllNeededTaskToRunningTaskList() {
+
+    }
 
 
     @Override
