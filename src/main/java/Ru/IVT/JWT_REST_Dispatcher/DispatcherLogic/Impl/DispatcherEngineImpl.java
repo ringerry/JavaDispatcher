@@ -10,6 +10,7 @@ import Ru.IVT.JWT_REST_Dispatcher.Model.TaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Service.TaskService;
 import Ru.IVT.JWT_REST_Dispatcher.Tools.BashTools;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -45,6 +46,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     private Integer curQuantumAtRaundRobin;
     private LinkedList<Task> roundRobinTaskQueue;
     private HashMap<Long, LinkedList<Task>> UserQueues;
+
+    /** Список millTaskList хранит выполняющиеся задачи. */
     private LinkedList<Task> millTaskList;
     private Task roundRobinCurrenTask;
 
@@ -63,6 +66,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         this.curQuantumAtRaundRobin = 0;
         this.roundRobinTaskQueue = new LinkedList<>();
         this.UserQueues = new HashMap<>();
+
         this.millTaskList = new LinkedList<>();
         this.myTimer = new Timer();
         startMainTimer();
@@ -215,6 +219,10 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }, 10000L, dispatcherQuantumPeriodMS);
     }
 
+    /**Удаляет все архивы и папки, на которые не ссылаются задачи из БД */
+    private void brushTrash(){}
+
+
 
     private boolean isFolderExist(String folderPath) {
 
@@ -316,17 +324,55 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
 
+
+    private boolean isTaskRunInDocker(Long taskId) throws Exception{
+
+        //        sudo docker ps -aqf "ancestor=2da48882-61a9-4a26-8399-39d4f5d97a60" контейнер по образу
+//        sudo docker ps  -aqf "id=c8ebce292681"  - данные по контейнеру
+//        sudo docker inspect --format='{{json .State }}' <container_id>
+
+        Task task = taskService.getTaskById(taskId);
+        String fileUUID = getUUIDFromFileName(task.getSource_file_name());
+
+        ArrayList<String> containersFromImage =
+                BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+fileUUID ,"");
+
+        if(containersFromImage.size()==1){
+
+            ArrayList<String> commandResult =
+                    BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
+                            containersFromImage.get(0),"");
+
+            JSONObject taskState = new JSONObject(commandResult.get(0));
+
+            return taskState.get("Status")=="running";
+
+
+        }
+        else{
+            // Должен быть 1 контейнер на 1 образ
+            ArrayList<String> commandResult =
+                    BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
+                            containersFromImage.get(0),"");
+
+            JSONObject taskState = new JSONObject(commandResult.get(0));
+
+            return taskState.get("Status")=="running";
+        }
+
+//        return true;
+    }
+
+
     private boolean isDockerImageExist(Long taskId) throws Exception {
         Task task = taskService.getTaskById(taskId);
+        String fileUUID = getUUIDFromFileName(task.getSource_file_name());
+
 
         ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .Config}}' $INSTANCE_ID " +
                 getUUIDFromFileName(task.getSource_file_name()), "");
 
-        if (!commandResult.get(0).equals("")) {
-            return true;
-        }
-
-        return false;
+        return !commandResult.get(0).equals("");
 
     }
 
@@ -391,6 +437,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         createImages();
 
         updateUserQueues();
+
+
         updateMillTaskList();
 
         sendUserTaskQueuesToMill();
@@ -398,49 +446,49 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
 
 
-        checkTaskCompleteOrHaveTheErrors();
+//        checkTaskCompleteOrHaveTheErrors();
 
-        // Первый запуск или обошли круг
-        if (this.curQuantumAtRaundRobin == 0/*&&UserQueues.size()!=0*/) {
-            //Сердце диспетчера!
-
-            if (millTaskList.size() < Constanta.serverTasksLimit) {
-                // Место на запуск есть
-                runAllNeededTaskToRunningTaskList();
-            }
-
-            Task firstTask = roundRobinTaskQueue.getFirst();
-
-//            roundRobinTaskQueue.addLast(firstTask);
-
-            if (isDockerImageExist(firstTask.getId())) {
-                if (!isTaskRun(firstTask.getId())) {
-                    if (roundRobinCurrenTask == null) {
-                        roundRobinCurrenTask = firstTask;
-                    } else {
-                        pauseTask(roundRobinCurrenTask.getId());
-                        roundRobinTaskQueue.addLast(roundRobinCurrenTask);
-                        roundRobinCurrenTask = firstTask;
-                    }
-                    roundRobinTaskQueue.removeFirst();
-                    runTask(firstTask.getId());
-                } else {
-                    log.error("Задача уже запущена");
-                }
-
-            } else {
-                log.error("Образа задачи не существует");
-            }
-
-        }
-
-        // Каждые quantumsAtRaundRobin квантов задачи сменяются
-        this.curQuantumAtRaundRobin = this.curQuantumAtRaundRobin % this.quantumsAtRaundRobin;
-
-
-//        if (taskQueue.size()!=0){
-//            log.info("Задача {} в очереди",taskQueue.get(0).getName());
+//        // Первый запуск или обошли круг
+//        if (this.curQuantumAtRaundRobin == 0/*&&UserQueues.size()!=0*/) {
+//            //Сердце диспетчера!
+//
+//            if (millTaskList.size() < Constanta.serverTasksLimit) {
+//                // Место на запуск есть
+//                runAllNeededTaskToRunningTaskList();
+//            }
+//
+//            Task firstTask = roundRobinTaskQueue.getFirst();
+//
+////            roundRobinTaskQueue.addLast(firstTask);
+//
+//            if (isDockerImageExist(firstTask.getId())) {
+//                if (!isTaskRun(firstTask.getId())) {
+//                    if (roundRobinCurrenTask == null) {
+//                        roundRobinCurrenTask = firstTask;
+//                    } else {
+//                        pauseTask(roundRobinCurrenTask.getId());
+//                        roundRobinTaskQueue.addLast(roundRobinCurrenTask);
+//                        roundRobinCurrenTask = firstTask;
+//                    }
+//                    roundRobinTaskQueue.removeFirst();
+//                    runTask(firstTask.getId());
+//                } else {
+//                    log.error("Задача уже запущена");
+//                }
+//
+//            } else {
+//                log.error("Образа задачи не существует");
+//            }
+//
 //        }
+//
+//        // Каждые quantumsAtRaundRobin квантов задачи сменяются
+//        this.curQuantumAtRaundRobin = this.curQuantumAtRaundRobin % this.quantumsAtRaundRobin;
+//
+//
+////        if (taskQueue.size()!=0){
+////            log.info("Задача {} в очереди",taskQueue.get(0).getName());
+////        }
 
         mappingInside2OutsideTaskState();
         mappingOutside2InsideTaskState();
@@ -448,8 +496,51 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
+
+
+
+    /** Проверяет список millTaskList на завершённые или ошибочные программы(в докере).
+     * По окончании работы метода список millTaskList содержит только выполняющиеся задачи*/
+
     private void updateMillTaskList() {
-        //Проверка докера на завершения и ошибки
+
+//        docker ps -aqf "ancestor=<image_name>"
+//        docker ps -aqf "ancestor=<image_name>"
+//        sudo docker ps -af "ancestor=2da48882-61a9-4a26-8399-39d4f5d97a60" контейнер по образу
+//        sudo docker ps  -af "id=c8ebce292681"  - данные по контейнеру
+//        sudo docker inspect --format='{{json .State }}' <container_id>
+
+        // TODO функцию проверки состояния контейнера по id задачи
+        //  цикл по задачам в списке мельницы с проверкой
+
+        LinkedList<Task> taskToRemove = new LinkedList<>();
+
+        millTaskList.forEach(task -> {
+            try {
+                if (!isTaskRunInDocker(task.getId())) taskToRemove.add(task);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+
+        taskToRemove.forEach(task -> {
+            millTaskList.remove(task);
+            removeTaskWithSaveResult( task.getId());
+        });
+
+
+
+    }
+
+
+    /**Удаляет задачу: образ, контейнер, но сохраняет исходники, данные, итог. Итогом может быть
+     * как логи, так и файлы, а также и первое и второе. Всё это хранится в отдельной папке. Задача может
+     * быть удалена из-за ошибок, поэтому пользователь скорее всего перезагрузит исходники или данные. При
+     * перезагрузке новых данных
+     * */
+    private void removeTaskWithSaveResult(Long id) {
+
+
     }
 
     private boolean canRunTaskOfThisUser(Long UserId) {
@@ -626,6 +717,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     private void updateUserQueues() {
 
         // За время работы задачи могли удалить, поэтому каждый раз приводим в соответсвие с состоянием из БД
+
+        //TODO сделать правильную проверку удалена ли задача
         initUserTaskQueues();
 
 //        ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
