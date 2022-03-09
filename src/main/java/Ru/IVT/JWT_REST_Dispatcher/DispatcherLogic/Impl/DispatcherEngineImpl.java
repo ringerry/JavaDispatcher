@@ -28,12 +28,15 @@ import java.util.regex.Pattern;
  * Диспетчеризация, алгоритмы приоритетов
  *
  * @author Меньшиков Артём
- * <p>
+ * <br>
  * Соглашения: UUID - по папке исходников
  */
 /*
 Все дейстия в task_in_run делает этот DispatcherEngine класс
  */
+
+
+//TODO передавать аргументы на запуск файла
 
 @Slf4j
 @Component
@@ -46,6 +49,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     private Integer curQuantumAtRaundRobin;
     private LinkedList<Task> roundRobinTaskQueue;
     private HashMap<Long, LinkedList<Task>> UserQueues;
+
+    private String argsFileName;
 
     /** Список millTaskList хранит выполняющиеся задачи. */
     private LinkedList<Task> millTaskList;
@@ -67,6 +72,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         this.roundRobinTaskQueue = new LinkedList<>();
         this.UserQueues = new HashMap<>();
 
+        this.argsFileName = "Аргументы.txt";
+
         this.millTaskList = new LinkedList<>();
         this.myTimer = new Timer();
         startMainTimer();
@@ -82,11 +89,23 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
+    private boolean isListContainsTask(ArrayList<Task> taskArray, Task task){
+
+        AtomicBoolean hasDuplicates = new AtomicBoolean(false);
+
+        taskArray.forEach(task1 -> {
+            if(Objects.equals(task1.getId(), task.getId())) hasDuplicates.set(true);
+        });
+
+        return hasDuplicates.get();
+    }
+
     private void initUserTaskQueues() {
 
 
         // На случай остановки сервера
         // TODO Подумать какие ещё состояния надо добавлять в очереди
+        // TODO сортировка задач в очереди по дате добавления
         ArrayList<Task> taskQueueRunning = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
 
@@ -108,6 +127,17 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                 log.warn(e.getMessage());
             }
         }
+
+        UserQueues.forEach((UserId,taskList)->{
+            taskList.sort((task1, task2) -> {
+
+                if (task1.getCreated().before(task2.getCreated()))
+                    return -1;
+                else if (task1.getCreated().after(task2.getCreated()))
+                    return 1;
+                return 0;
+            });
+        });
 
     }
 
@@ -291,18 +321,43 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         Process proc = Runtime.getRuntime().exec("zip -r " + zipFilePath + " " + folderPath);
     }
 
+    private ArrayList<String> getCmdParams(Long taskId) throws Exception {
+        ArrayList <String> params = new ArrayList<>();
+
+        try{
+
+//        String workDir = getTaskUnZipDir(taskId);
+
+            Path argsPath= Paths.get(getTaskUnZipDir(taskId)+this.argsFileName);
+            params = (ArrayList<String>) Files.readAllLines(argsPath);
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+
+        return params;
+    }
+
 
     private void dockerCreateImage(String dir2UpZip, Long taskId) throws Exception {
 
 
         String taskSourceFile = taskService.getTaskById(taskId).getSource_file_name();
 
+        StringBuilder params = new StringBuilder();
+
+        ArrayList<String > arrParams = getCmdParams(taskId);
+        arrParams.forEach(param->{
+            params.append(param);
+            params.append(" ");
+        });
+
 
         try (FileWriter writer = new FileWriter(dir2UpZip + "/Dockerfile", false)) {
             writer.write("FROM python\n");
             writer.write("WORKDIR /code\n");
             writer.write("COPY . .\n");
-            writer.write("CMD [\"python3\",\"Main.py\"]\n");
+            writer.write("CMD python3 Main.py "+params+" \n");
 
             writer.flush();
         } catch (Exception e) {
@@ -401,7 +456,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         try {
             Task task = taskService.getTaskById(taskId);
 
-            ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker run " +
+            // TODO  -d добавить
+            ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker run -d " +
                     getUUIDFromFileName(task.getSource_file_name()), "");
 
             NewTaskDto newTaskDto = new NewTaskDto();
@@ -535,12 +591,36 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     /**Удаляет задачу: образ, контейнер, но сохраняет исходники, данные, итог. Итогом может быть
      * как логи, так и файлы, а также и первое и второе. Всё это хранится в отдельной папке. Задача может
-     * быть удалена из-за ошибок, поэтому пользователь скорее всего перезагрузит исходники или данные. При
+     * быть удалена из-за ошибок, поэтому пользователь, скорее всего, перезагрузит исходники или данные. При
      * перезагрузке новых данных
      * */
-    private void removeTaskWithSaveResult(Long id) {
+    private void removeTaskWithSaveResult(Long taskId) {
+        try {
+
+            Task task = taskService.getTaskById(taskId);
+            String taskUUID = getUUIDFromFileName(task.getSource_file_name());
 
 
+            ArrayList<String> containersFromImage =
+                    BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+taskUUID ,"");
+
+            containersFromImage.forEach(container->{
+                try {
+                    BashTools.bashCommand("echo 'q'|sudo -S docker rm " + container, "");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+            BashTools.bashCommand("echo 'q'|sudo -S docker rmi " + taskUUID, "");
+
+
+//            taskService.deleteTask(newTaskDto, UserId);
+
+//            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+//            return false;
+        }
     }
 
     private boolean canRunTaskOfThisUser(Long UserId) {
@@ -718,8 +798,31 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         // За время работы задачи могли удалить, поэтому каждый раз приводим в соответсвие с состоянием из БД
 
+
+        ArrayList<Task> taskQueue = taskService.getTasksByStatus(TaskStatusEnum.УДАЛЕНА);
+
+        taskQueue.forEach(task -> {
+            UserQueues.get(task.getUser_id()).removeIf(t->t.getId()==task.getId());
+        });
+
+//        Set<Task> toRemove = new HashSet<>();
+//
+//
+//        this.UserQueues.forEach((k,v)->{
+//            v.forEach(task -> {
+//                if (task.getStatus()==TaskStatusEnum.УДАЛЕНА){
+//                    toRemove.add(task);
+//                }
+//            });
+//        });
+//
+//        toRemove.forEach(task -> {
+//            UserQueues.get(task.getUser_id()).remove(task);
+//        });
+
+
         //TODO сделать правильную проверку удалена ли задача
-        initUserTaskQueues();
+//        initUserTaskQueues();
 
 //        ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
 //
@@ -792,11 +895,22 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             BashTools.bashCommand("echo 'q' |  sudo -S rm " + task.getSource_file_name(), "");
             BashTools.bashCommand("echo 'q' |  sudo -S rm " + task.getData_file_name(), "");
 
+
+            ArrayList<String> containersFromImage =
+                    BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+taskUUID ,"");
+
+            containersFromImage.forEach(container->{
+                try {
+                    BashTools.bashCommand("echo 'q'|sudo -S docker rm " + container, "");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
             BashTools.bashCommand("echo 'q'|sudo -S docker rmi " + taskUUID, "");
 
-            // TODO Удаление контейнеров по задаче
+//             DONE_TODO Удаление контейнеров по задаче
 
-            taskService.deleteTask(newTaskDto, UserId);
+//            taskService.deleteTask(newTaskDto, UserId);
 
             return true;
         } catch (Exception e) {

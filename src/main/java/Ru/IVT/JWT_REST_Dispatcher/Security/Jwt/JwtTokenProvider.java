@@ -38,7 +38,7 @@ public class JwtTokenProvider {
     private static String secret="IVTFAVT";
 
 //    @Value("${jwt.token.expired}")
-    private static long validityInMilliseconds=28800000;
+    private static long validityInMilliseconds=2880000000L;
 
 
     @Autowired
