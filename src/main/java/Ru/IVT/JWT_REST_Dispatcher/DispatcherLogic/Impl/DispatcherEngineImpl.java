@@ -669,7 +669,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         taskToRemove.forEach(task -> {
             millTaskList.remove(task);
-            removeTaskWithSaveResult(task.getId());
+//            removeTaskWithSaveResult(task.getId());
         });
 
 
@@ -769,7 +769,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
         int freePositionCounter = Constanta.serverTasksLimit - millTaskList.size();
-        if (freePositionCounter > 0) {
+        if ( ( freePositionCounter > 0 ) && ( UserQueues.size() > 0 ) ) {
 
             if (freePositionCounter <= newWaitingUsersSet.size()) {
                 // из каждой очереди в место на мельнице, состояние
@@ -797,6 +797,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
                 AtomicBoolean canSendToMill = new AtomicBoolean(true);
+
+                // TODO возможно зацикливание из-за пустой очереди
                 while (canSendToMill.get()) {
 
 
@@ -881,66 +883,76 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         ArrayList<Task> taskQueue = taskService.getTasksByStatus(TaskStatusEnum.УДАЛЕНА);
 
-        try {
-            taskQueue.forEach(task -> {
-                if (UserQueues.get(task.getUser_id()).size() != 0) {
-                    UserQueues.get(task.getUser_id()).removeIf(t -> t.getId() == task.getId());
+        if(!UserQueues.isEmpty()){
 
+            try {
+                taskQueue.forEach(task -> {
+                    if (UserQueues.get(task.getUser_id()).size() != 0) {
+                        UserQueues.get(task.getUser_id()).removeIf(t -> t.getId() == task.getId());
+
+                    }
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                int a = 1;
+            }
+            // Удаление пустых очередей
+            Set<Long> emptyQueues = new HashSet<>();
+
+            UserQueues.forEach((User, taskList) -> {
+                if (taskList.size() == 0) {
+                    emptyQueues.add(User);
                 }
             });
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            int a = 1;
+            UserQueues.keySet().removeAll(emptyQueues);
         }
 
-        // Удаление пустых очередей
-        Set<Long> emptyQueues = new HashSet<>();
 
-        UserQueues.forEach((User, taskList) -> {
-            if (taskList.size() == 0) {
-                emptyQueues.add(User);
+        // Добавление новых задач
+
+        taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
+
+//        taskQueue.addAll(taskQueueRunning);
+
+        for (Task task : taskQueue) {
+            try {
+                if(UserQueues.containsKey(task.getUser_id())){
+
+                    boolean contains = false;
+                    for(Task task1:UserQueues.get(task.getUser_id())){
+                        if(task1.getId().equals(task.getId())){
+                            contains = true;
+                            break;
+                        }
+                    }
+                    if (!contains) {
+                        UserQueues.get(task.getUser_id()).add(task);
+                    }
+                }
+                else{
+                    LinkedList<Task> UserQueue = new LinkedList<>();
+                    UserQueue.add(task);
+                    UserQueues.put(task.getUser_id(), (LinkedList<Task>) UserQueue.clone());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                log.warn(e.getMessage());
             }
-        });
+        }
 
-        UserQueues.keySet().removeAll(emptyQueues);
+        if (!UserQueues.isEmpty()){
+            UserQueues.forEach((UserId, taskList) -> {
+                taskList.sort((task1, task2) -> {
 
-
-//        Set<Task> toRemove = new HashSet<>();
-//
-//
-//        this.UserQueues.forEach((k,v)->{
-//            v.forEach(task -> {
-//                if (task.getStatus()==TaskStatusEnum.УДАЛЕНА){
-//                    toRemove.add(task);
-//                }
-//            });
-//        });
-//
-//        toRemove.forEach(task -> {
-//            UserQueues.get(task.getUser_id()).remove(task);
-//        });
-
-
-        //TODO сделать правильную проверку удалена ли задача
-//        initUserTaskQueues();
-
-//        ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
-//
-//        UserQueues = new HashMap<>();
-//
-//        for (Task task:taskQueue) {
-//            try {
-//
-//                LinkedList<Task> UserQueue = new LinkedList<>();
-//                UserQueue.add(task);
-//
-//                UserQueues.put(task.getUser_id(), (LinkedList<Task>) UserQueue.clone());
-//
-//            }catch (Exception e){
-//                log.warn(e.getMessage());
-//            }
-//        }
+                    if (task1.getCreated().before(task2.getCreated()))
+                        return -1;
+                    else if (task1.getCreated().after(task2.getCreated()))
+                        return 1;
+                    return 0;
+                });
+            });
+        }
 
     }
 
