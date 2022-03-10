@@ -82,6 +82,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         // Отображение внешнего состояния на внутреннее с разрешением противоречий.
 
+        initMillTask();
         mappingOutside2InsideTaskState();
         initUserTaskQueues();
 
@@ -100,16 +101,18 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         return hasDuplicates.get();
     }
 
+
+
     private void initUserTaskQueues() {
 
 
         // На случай остановки сервера
         // TODO Подумать какие ещё состояния надо добавлять в очереди
         // TODO сортировка задач в очереди по дате добавления
-        ArrayList<Task> taskQueueRunning = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
+//        ArrayList<Task> taskQueueRunning = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
         ArrayList<Task> taskQueue = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.В_ОЧЕРЕДИ);
 
-        taskQueue.addAll(taskQueueRunning);
+//        taskQueue.addAll(taskQueueRunning);
 
         for (Task task : taskQueue) {
             try {
@@ -141,11 +144,71 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
-    private void mappingDocker2InsideStatus(){
+    private void initMillTask(){
+
+        mappingDocker2InsideStatus();
+
+        ArrayList<Task> runningTasks = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
+
+        millTaskList = new LinkedList<>();
+
+//        int millCounter = 0;
+        for(Task task: runningTasks){
+            millTaskList.add(task);
+            if (millTaskList.size()==Constanta.serverTasksLimit) break;
+        }
+
+
+
 
     }
 
-    private void initMillTask(){
+    private void mappingDocker2InsideStatus() {
+
+        ArrayList<Task> allTasks = taskService.getAllTasks();
+
+        allTasks.forEach(task -> {
+
+            try{
+
+                String fileUUID = getUUIDFromFileName(task.getSource_file_name());
+
+                ArrayList<String> containersFromImage =
+                        BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf ancestor="+fileUUID ,"");
+
+
+                ArrayList<String> commandResult =
+                        BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
+                                containersFromImage.get(0),"");
+
+                JSONObject taskState = new JSONObject(commandResult.get(0));
+
+                NewTaskDto newTaskDto = new NewTaskDto();
+                newTaskDto.setId(task.getId());
+
+                if(taskState.get("Status")=="running"){
+                    newTaskDto.setInside_status(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
+                    taskService.updateInsideTaskStatus(newTaskDto);
+                }
+                else if(taskState.get("Status")=="paused"){
+                    newTaskDto.setInside_status(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА);
+                    taskService.updateInsideTaskStatus(newTaskDto);
+                }
+                else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")==0)){
+                    newTaskDto.setInside_status(InsideTaskStatusEnum.ЗАВЕРШЕНА);
+                    taskService.updateInsideTaskStatus(newTaskDto);
+                }
+                else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")!=0)){
+                    newTaskDto.setInside_status(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
+                    taskService.updateInsideTaskStatus(newTaskDto);
+                }
+
+//                return taskState.get("Status")=="running";
+            }
+            catch(Exception e ){
+                e.printStackTrace();
+            }
+        });
 
     }
 
@@ -465,10 +528,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         try {
             Task task = taskService.getTaskById(taskId);
+            String taskUUID = getUUIDFromFileName(task.getSource_file_name());
 
-            // TODO  -d добавить
+            // DONE_TODO  -d добавить
             ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker run -d " +
-                    getUUIDFromFileName(task.getSource_file_name()), "");
+                    "--mount source=vol_"+taskUUID+",target=/code " +
+                    taskUUID, "");
 
             NewTaskDto newTaskDto = new NewTaskDto();
             newTaskDto.setId(taskId);
@@ -501,6 +566,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         // Полное соответсвие с БД на момент обновления
         prepareFolders();
         createImages();
+
+        mappingDocker2InsideStatus();
 
         updateUserQueues();
 
@@ -556,8 +623,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 ////            log.info("Задача {} в очереди",taskQueue.get(0).getName());
 ////        }
 
-        mappingInside2OutsideTaskState();
-        mappingOutside2InsideTaskState();
+//        mappingInside2OutsideTaskState();
+//        mappingOutside2InsideTaskState();
 
 
     }
