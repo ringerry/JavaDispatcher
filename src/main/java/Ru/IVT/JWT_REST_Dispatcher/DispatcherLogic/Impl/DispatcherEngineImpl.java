@@ -752,9 +752,24 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             runningUsersSet.add(t.getUser_id());
         });
 
-        Set<Long> newWaitingUsers = new HashSet<>(UserQueues.keySet()) ;
 
-        newWaitingUsers.removeAll(runningUsersSet);
+        Set<Long> newWaitingUsersSet = new HashSet<>(UserQueues.keySet()) ;
+
+        newWaitingUsersSet.removeAll(runningUsersSet);
+
+        ArrayList<Long> newWaitingUsersList = new ArrayList<>(newWaitingUsersSet);
+
+
+
+        // Сортировка пользователей по порядку поступления задач
+        newWaitingUsersList.sort((User1, User2) -> {
+
+            if (UserQueues.get(User1).getFirst().getCreated().before(UserQueues.get(User2).getFirst().getCreated()))
+                return -1;
+            else if (UserQueues.get(User1).getFirst().getCreated().after(UserQueues.get(User2).getFirst().getCreated()))
+                return 1;
+            return 0;
+        });
 
 
         int freePositionCounter = Constanta.serverTasksLimit - millTaskList.size();
@@ -767,13 +782,29 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                 }
             });
 
-            if (freePositionCounter < newWaitingUsers.size()) {
-                /* Создаем список из всех первых задач очередей и вибираем самые раниие задачи,
-                 * добавляем в мельницу, извлекаем из очереди, меняем внутреннее состояние
+            if (freePositionCounter <= newWaitingUsersSet.size()) {
+                // из каждой очереди в место на мельнице, состояние
+
+                for(Long UserId:newWaitingUsersList){
+
+                    if(millTaskList.size()<Constanta.serverTasksLimit){
+                        runTask(UserQueues.get(UserId).removeFirst().getId());
+                    }
+                    else {
+                        break;
+                    }
+
+                }
+
+            } else {
+                /* freePositionCounter>newWaitingUsersSet.size()
+                 * Тасование: берём по одной первой задаче из каждой очереди и добавляем в мельницу, до тех пор
+                 * пока вся мельница не заполнится или не закончатся задачи, состояние
                  * */
 
-                // В порядке возрастания новизны, чем меньше индекс тем раньше пришла задача
-                firstTasks.sort((task1, task2) -> {
+                ArrayList<Task> allTheQueueTasks = taskService.getTasksByStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
+
+                allTheQueueTasks.sort((task1, task2) -> {
 
                     if (task1.getCreated().before(task2.getCreated()))
                         return -1;
@@ -782,65 +813,29 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                     return 0;
                 });
 
-                /* Удаляем из очереди, и запускаем(докер + мельница + смена состояния)
-                 * Не весь список первых задач, а только то количество, кторое = свободным местам в мельнице*/
-
-//                int i = 0;
-//                while(i<freePositionCounter){
-//                    if(canRunTaskOfThisUser(firstTasks.get(i).getUser_id())){
-//                        UserQueues.get(firstTasks.get(i).getUser_id()).removeFirst();
-//                        runTask(firstTasks.get(i).getId());
-//                        ++i;
-//                    }
-//                }
-
-                for (int i = 0; i < freePositionCounter; ++i) {
-                    runTask(UserQueues.get(firstTasks.get(i).getUser_id()).removeFirst().getId());
-                }
-
-            } else if (freePositionCounter == newWaitingUsers.size()) {
-                // из каждой очереди в место на мельнице, состояние
-
-//                int i = 0;
-//                while(i<freePositionCounter){
-//                    if(canRunTaskOfThisUser(firstTasks.get(i).getUser_id())){
-//                        UserQueues.get(firstTasks.get(i).getUser_id()).removeFirst();
-//                        runTask(firstTasks.get(i).getId());
-//                    }
-//                    ++i;
-//                }
-
-                for (int i = 0; i < freePositionCounter; ++i) {
-//                    UserQueues.get(firstTasks.get(i).getUser_id()).removeFirst();
-                    runTask(UserQueues.get(firstTasks.get(i).getUser_id()).removeFirst().getId());
-                }
-            } else {
-                /* freePositionCounter>newWaitingUsers.size()
-                 * Тасование: берём по одной первой задаче из каждой очереди и добавляем в мельницу, до тех пор
-                 * пока вся мельница не заполнится или не закончатся задачи, состояние
-                 * */
-
-                ArrayList<Task> allTheQueueTasks = taskService.getTasksByStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
-
                 if (allTheQueueTasks.size() > freePositionCounter) {
 
 
                     AtomicBoolean canSendToMill = new AtomicBoolean(true);
                     while (canSendToMill.get()) {
 
-                        UserQueues.forEach((k, v) -> {
 
-                            try {
-                                runTask(v.removeFirst().getId());
-                            } catch (Exception e) {
-                                e.printStackTrace();
+                        updateUserQueues();
+                        ArrayList<Long> UsersList = new ArrayList<>(UserQueues.keySet());
+
+
+
+                        for(Long UserId: UsersList){
+
+                            if(millTaskList.size()<Constanta.serverTasksLimit){
+                                runTask(UserQueues.get(UserId).removeFirst().getId());
                             }
-                            if (millTaskList.size() == Constanta.serverTasksLimit) {
+                            else {
                                 canSendToMill.set(false);
+                                break;
                             }
+                        }
 
-//                            firstTasks.add( v.getFirst());
-                        });
                     }
 
                 } else {
@@ -889,6 +884,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }
     }
 
+    /**Удаляет из очереди задачи, помеченных как удаленные, уадаляет пустые очереди*/
     private void updateUserQueues() {
 
         // За время работы задачи могли удалить, поэтому каждый раз приводим в соответсвие с состоянием из БД
@@ -909,6 +905,17 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             e.printStackTrace();
             int a =1;
         }
+
+        // Удаление пустых очередей
+        Set <Long> emptyQueues = new HashSet<>();
+
+        UserQueues.forEach((User,taskList)->{
+            if(taskList.size()==0){
+                emptyQueues.add(User);
+            }
+        });
+
+        UserQueues.keySet().removeAll(emptyQueues);
 
 
 //        Set<Task> toRemove = new HashSet<>();
