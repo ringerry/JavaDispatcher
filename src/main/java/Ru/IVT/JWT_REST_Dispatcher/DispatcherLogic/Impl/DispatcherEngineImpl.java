@@ -173,36 +173,37 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
                 String fileUUID = getUUIDFromFileName(task.getSource_file_name());
 
-                ArrayList<String> containersFromImage =
-                        BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf ancestor="+fileUUID ,"");
+//                ArrayList<String> containersFromImage =
+//                        BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf ancestor="+fileUUID ,"");
 
-                if(containersFromImage.size()!=0){
+//                if(containersFromImage.size()!=0){
+
                     ArrayList<String> commandResult =
                             BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
-                                    containersFromImage.get(0),"");
+                                    "container_"+fileUUID,"");
 
                     JSONObject taskState = new JSONObject(commandResult.get(0));
 
                     NewTaskDto newTaskDto = new NewTaskDto();
                     newTaskDto.setId(task.getId());
 
-                    if(taskState.get("Status")=="running"){
+                    if("running".equals(taskState.get("Status"))){
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-                    else if(taskState.get("Status")=="paused"){
+                    else if("paused".equals(taskState.get("Status"))){
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-                    else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")==0)){
+                    else if("exited".equals(taskState.get("Status"))&&((Objects.equals(taskState.get("ExitCode"),0)))){
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ЗАВЕРШЕНА);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-                    else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")!=0)){
+                    else if("exited".equals(taskState.get("Status"))&&(!(Objects.equals(taskState.get("ExitCode"),0)))){
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-                }
+//                }
 
 
 
@@ -474,22 +475,22 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         Task task = taskService.getTaskById(taskId);
         String fileUUID = getUUIDFromFileName(task.getSource_file_name());
 
-        ArrayList<String> containersFromImage =
-                BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+fileUUID ,"");
+//        ArrayList<String> containersFromImage =
+//                BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+fileUUID ,"");
 
-        if(containersFromImage.size()>=1){
+//        if(containersFromImage.size()>=1){
 
             ArrayList<String> commandResult =
                     BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
-                            containersFromImage.get(0),"");
+                            "container_"+fileUUID,"");
 
             JSONObject taskState = new JSONObject(commandResult.get(0));
 
-            return taskState.get("Status")=="running";
+            return "running".equals(taskState.get("Status"));
 
 
-        }
-        else {
+//        }
+//        else {
 //            // Должен быть 1 контейнер на 1 образ
 //            ArrayList<String> commandResult =
 //                    BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
@@ -497,8 +498,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 //
 //            JSONObject taskState = new JSONObject(commandResult.get(0));
 
-            return false;
-        }
+//            return false;
+//        }
 
 
 //        return true;
@@ -546,6 +547,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             // DONE_TODO  -d добавить
             ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker run -d " +
                     "--mount source=vol_"+taskUUID+",target=/code " +
+                    " --name container_"+taskUUID+" "+
                     taskUUID, "");
 
             NewTaskDto newTaskDto = new NewTaskDto();
@@ -679,6 +681,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         });
 
 
+        int a = 0;
 
     }
 
