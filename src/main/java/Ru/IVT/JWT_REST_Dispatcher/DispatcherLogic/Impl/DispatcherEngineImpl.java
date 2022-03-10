@@ -569,7 +569,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     // Основная логика диспетчера
     private void dispatcherQuantum() throws Exception {
 
-//        mappingOutside2InsideTaskState();
+        mappingOutside2InsideTaskState();
 
 
         // Полное соответсвие с БД на момент обновления
@@ -590,7 +590,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
 
 
-//        mappingInside2OutsideTaskState();
+        mappingInside2OutsideTaskState();
 
 
 
