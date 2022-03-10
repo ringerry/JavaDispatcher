@@ -186,16 +186,13 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                     if ("running".equals(taskState.get("Status"))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
                         taskService.updateInsideTaskStatus(newTaskDto);
-                    }
-                    else if ("paused".equals(taskState.get("Status"))) {
+                    } else if ("paused".equals(taskState.get("Status"))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА);
                         taskService.updateInsideTaskStatus(newTaskDto);
-                    }
-                    else if ("exited".equals(taskState.get("Status")) && ((Objects.equals(taskState.get("ExitCode"), 0)))) {
+                    } else if ("exited".equals(taskState.get("Status")) && ((Objects.equals(taskState.get("ExitCode"), 0)))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ЗАВЕРШЕНА);
                         taskService.updateInsideTaskStatus(newTaskDto);
-                    }
-                    else if ("exited".equals(taskState.get("Status")) && (!(Objects.equals(taskState.get("ExitCode"), 0)))) {
+                    } else if ("exited".equals(taskState.get("Status")) && (!(Objects.equals(taskState.get("ExitCode"), 0)))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
@@ -474,7 +471,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                 BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' " +
                         "container_" + fileUUID, "");
 
-        if(!commandResult.get(0).isEmpty()){
+        if (!commandResult.get(0).isEmpty()) {
 
             JSONObject taskState = new JSONObject(commandResult.get(0));
 
@@ -753,12 +750,11 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         });
 
 
-        Set<Long> newWaitingUsersSet = new HashSet<>(UserQueues.keySet()) ;
+        Set<Long> newWaitingUsersSet = new HashSet<>(UserQueues.keySet());
 
         newWaitingUsersSet.removeAll(runningUsersSet);
 
         ArrayList<Long> newWaitingUsersList = new ArrayList<>(newWaitingUsersSet);
-
 
 
         // Сортировка пользователей по порядку поступления задач
@@ -775,22 +771,14 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         int freePositionCounter = Constanta.serverTasksLimit - millTaskList.size();
         if (freePositionCounter > 0) {
 
-            LinkedList<Task> firstTasks = new LinkedList<>();
-            UserQueues.forEach((k, v) -> {
-                if (v.size() != 0) {
-                    firstTasks.add(v.getFirst());
-                }
-            });
-
             if (freePositionCounter <= newWaitingUsersSet.size()) {
                 // из каждой очереди в место на мельнице, состояние
 
-                for(Long UserId:newWaitingUsersList){
+                for (Long UserId : newWaitingUsersList) {
 
-                    if(millTaskList.size()<Constanta.serverTasksLimit){
+                    if (millTaskList.size() < Constanta.serverTasksLimit) {
                         runTask(UserQueues.get(UserId).removeFirst().getId());
-                    }
-                    else {
+                    } else {
                         break;
                     }
 
@@ -802,43 +790,42 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                  * пока вся мельница не заполнится или не закончатся задачи, состояние
                  * */
 
-                ArrayList<Task> allTheQueueTasks = taskService.getTasksByStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
-
-                allTheQueueTasks.sort((task1, task2) -> {
-
-                    if (task1.getCreated().before(task2.getCreated()))
-                        return -1;
-                    else if (task1.getCreated().after(task2.getCreated()))
-                        return 1;
-                    return 0;
-                });
-
-                if (allTheQueueTasks.size() > freePositionCounter) {
+//                ArrayList<Task> allTheQueueTasks = taskService.getTasksByStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
+//
+//
+//                if (allTheQueueTasks.size() > freePositionCounter) {
 
 
-                    AtomicBoolean canSendToMill = new AtomicBoolean(true);
-                    while (canSendToMill.get()) {
+                AtomicBoolean canSendToMill = new AtomicBoolean(true);
+                while (canSendToMill.get()) {
 
 
-                        updateUserQueues();
-                        ArrayList<Long> UsersList = new ArrayList<>(UserQueues.keySet());
+                    updateUserQueues();
+                    ArrayList<Long> UsersList = new ArrayList<>(UserQueues.keySet());
 
+                    // Сортировка пользователей по дате создания первой задачи в очереди
+                    UsersList.sort((User1, User2) -> {
 
+                        if (UserQueues.get(User1).getFirst().getCreated().before(UserQueues.get(User2).getFirst().getCreated()))
+                            return -1;
+                        else if (UserQueues.get(User1).getFirst().getCreated().after(UserQueues.get(User2).getFirst().getCreated()))
+                            return 1;
+                        return 0;
+                    });
 
-                        for(Long UserId: UsersList){
+                    for (Long UserId : UsersList) {
 
-                            if(millTaskList.size()<Constanta.serverTasksLimit){
-                                runTask(UserQueues.get(UserId).removeFirst().getId());
-                            }
-                            else {
-                                canSendToMill.set(false);
-                                break;
-                            }
+                        if (millTaskList.size() < Constanta.serverTasksLimit) {
+                            runTask(UserQueues.get(UserId).removeFirst().getId());
+                        } else {
+                            canSendToMill.set(false);
+                            break;
                         }
-
                     }
 
-                } else {
+                }
+
+                /*} else {
                     allTheQueueTasks.forEach((t) -> {
                         try {
                             runTask(UserQueues.get(t.getUser_id()).removeFirst().getId());
@@ -846,7 +833,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                             e.printStackTrace();
                         }
                     });
-                }
+                }*/
             }
         }
     }
@@ -884,7 +871,9 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }
     }
 
-    /**Удаляет из очереди задачи, помеченных как удаленные, уадаляет пустые очереди*/
+    /**
+     * Удаляет из очереди задачи, помеченных как удаленные, уадаляет пустые очереди
+     */
     private void updateUserQueues() {
 
         // За время работы задачи могли удалить, поэтому каждый раз приводим в соответсвие с состоянием из БД
@@ -892,7 +881,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         ArrayList<Task> taskQueue = taskService.getTasksByStatus(TaskStatusEnum.УДАЛЕНА);
 
-        try{
+        try {
             taskQueue.forEach(task -> {
                 if (UserQueues.get(task.getUser_id()).size() != 0) {
                     UserQueues.get(task.getUser_id()).removeIf(t -> t.getId() == task.getId());
@@ -900,17 +889,16 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                 }
             });
 
-        }
-        catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
-            int a =1;
+            int a = 1;
         }
 
         // Удаление пустых очередей
-        Set <Long> emptyQueues = new HashSet<>();
+        Set<Long> emptyQueues = new HashSet<>();
 
-        UserQueues.forEach((User,taskList)->{
-            if(taskList.size()==0){
+        UserQueues.forEach((User, taskList) -> {
+            if (taskList.size() == 0) {
                 emptyQueues.add(User);
             }
         });
