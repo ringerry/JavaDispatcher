@@ -176,32 +176,35 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                 ArrayList<String> containersFromImage =
                         BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf ancestor="+fileUUID ,"");
 
+                if(containersFromImage.size()!=0){
+                    ArrayList<String> commandResult =
+                            BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
+                                    containersFromImage.get(0),"");
 
-                ArrayList<String> commandResult =
-                        BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
-                                containersFromImage.get(0),"");
+                    JSONObject taskState = new JSONObject(commandResult.get(0));
 
-                JSONObject taskState = new JSONObject(commandResult.get(0));
+                    NewTaskDto newTaskDto = new NewTaskDto();
+                    newTaskDto.setId(task.getId());
 
-                NewTaskDto newTaskDto = new NewTaskDto();
-                newTaskDto.setId(task.getId());
+                    if(taskState.get("Status")=="running"){
+                        newTaskDto.setInside_status(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
+                        taskService.updateInsideTaskStatus(newTaskDto);
+                    }
+                    else if(taskState.get("Status")=="paused"){
+                        newTaskDto.setInside_status(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА);
+                        taskService.updateInsideTaskStatus(newTaskDto);
+                    }
+                    else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")==0)){
+                        newTaskDto.setInside_status(InsideTaskStatusEnum.ЗАВЕРШЕНА);
+                        taskService.updateInsideTaskStatus(newTaskDto);
+                    }
+                    else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")!=0)){
+                        newTaskDto.setInside_status(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
+                        taskService.updateInsideTaskStatus(newTaskDto);
+                    }
+                }
 
-                if(taskState.get("Status")=="running"){
-                    newTaskDto.setInside_status(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
-                    taskService.updateInsideTaskStatus(newTaskDto);
-                }
-                else if(taskState.get("Status")=="paused"){
-                    newTaskDto.setInside_status(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА);
-                    taskService.updateInsideTaskStatus(newTaskDto);
-                }
-                else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")==0)){
-                    newTaskDto.setInside_status(InsideTaskStatusEnum.ЗАВЕРШЕНА);
-                    taskService.updateInsideTaskStatus(newTaskDto);
-                }
-                else if(taskState.get("Status")=="exited"&&((int)taskState.get("ExitCode")!=0)){
-                    newTaskDto.setInside_status(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
-                    taskService.updateInsideTaskStatus(newTaskDto);
-                }
+
 
 //                return taskState.get("Status")=="running";
             }
@@ -338,7 +341,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         String str = taskService.getTaskById(taskId).getSource_file_name().replace(".zip", "");
 
-        return taskService.getTaskById(taskId).getSource_file_name().replace(".zip", "");
+        return taskService.getTaskById(taskId).getSource_file_name().replace(".zip", "")+"/";
     }
 
     private void checkAndPrepareFolders(Long taskId) throws Exception {
@@ -355,7 +358,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             file.mkdir();
 
 
-            file = new File(dir2UpZip + "/Выход");
+            file = new File(dir2UpZip + "Выход");
             file.mkdir();
 
             unzip(sourcesPath, dir2UpZip);
@@ -419,11 +422,16 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         StringBuilder params = new StringBuilder();
 
-        ArrayList<String > arrParams = getCmdParams(taskId);
-        arrParams.forEach(param->{
-            params.append(param);
-            params.append(" ");
-        });
+        if(hasTaskCmdParams(taskId)){
+
+            ArrayList<String > arrParams = getCmdParams(taskId);
+            arrParams.forEach(param->{
+                params.append(param);
+                params.append(" ");
+            });
+        }
+
+
 
 
         try (FileWriter writer = new FileWriter(dir2UpZip + "/Dockerfile", false)) {
@@ -451,6 +459,10 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
+    private boolean hasTaskCmdParams(Long taskId) throws Exception {
+        Path argsPath= Paths.get(getTaskUnZipDir(taskId)+this.argsFileName);
+        return Files.exists(argsPath);
+    }
 
 
     private boolean isTaskRunInDocker(Long taskId) throws Exception{
@@ -636,6 +648,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
      * По окончании работы метода список millTaskList содержит только выполняющиеся задачи*/
 
     private void updateMillTaskList() {
+
+//        mappingDocker2InsideStatus();
 
 //        docker ps -aqf "ancestor=<image_name>"
 //        docker ps -aqf "ancestor=<image_name>"
