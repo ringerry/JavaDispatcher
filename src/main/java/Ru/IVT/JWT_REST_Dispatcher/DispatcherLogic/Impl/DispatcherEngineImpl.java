@@ -141,6 +141,16 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
+    private void mappingDocker2InsideStatus(){
+
+    }
+
+    private void initMillTask(){
+
+    }
+
+
+
     // Отображение внешнего состояния на внутреннее с разрешением противоречий.
     private void mappingOutside2InsideTaskState() {
         /*По умолчанию - не определено, если не определено то отобразить, иначе - главенство внутреннего состояния
