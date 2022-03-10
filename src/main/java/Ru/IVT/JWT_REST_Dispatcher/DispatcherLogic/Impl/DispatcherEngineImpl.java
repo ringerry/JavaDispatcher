@@ -52,7 +52,9 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     private String argsFileName;
 
-    /** Список millTaskList хранит выполняющиеся задачи. */
+    /**
+     * Список millTaskList хранит выполняющиеся задачи.
+     */
     private LinkedList<Task> millTaskList;
     private Task roundRobinCurrenTask;
 
@@ -90,17 +92,16 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
-    private boolean isListContainsTask(ArrayList<Task> taskArray, Task task){
+    private boolean isListContainsTask(ArrayList<Task> taskArray, Task task) {
 
         AtomicBoolean hasDuplicates = new AtomicBoolean(false);
 
         taskArray.forEach(task1 -> {
-            if(Objects.equals(task1.getId(), task.getId())) hasDuplicates.set(true);
+            if (Objects.equals(task1.getId(), task.getId())) hasDuplicates.set(true);
         });
 
         return hasDuplicates.get();
     }
-
 
 
     private void initUserTaskQueues() {
@@ -131,7 +132,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             }
         }
 
-        UserQueues.forEach((UserId,taskList)->{
+        UserQueues.forEach((UserId, taskList) -> {
             taskList.sort((task1, task2) -> {
 
                 if (task1.getCreated().before(task2.getCreated()))
@@ -144,7 +145,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
     }
 
-    private void initMillTask(){
+    private void initMillTask() {
 
         mappingDocker2InsideStatus();
 
@@ -153,12 +154,10 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         millTaskList = new LinkedList<>();
 
 //        int millCounter = 0;
-        for(Task task: runningTasks){
+        for (Task task : runningTasks) {
             millTaskList.add(task);
-            if (millTaskList.size()==Constanta.serverTasksLimit) break;
+            if (millTaskList.size() == Constanta.serverTasksLimit) break;
         }
-
-
 
 
     }
@@ -169,53 +168,45 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         allTasks.forEach(task -> {
 
-            try{
+            try {
 
                 String fileUUID = getUUIDFromFileName(task.getSource_file_name());
 
-//                ArrayList<String> containersFromImage =
-//                        BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf ancestor="+fileUUID ,"");
 
-//                if(containersFromImage.size()!=0){
-
-                    ArrayList<String> commandResult =
-                            BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
-                                    "container_"+fileUUID,"");
-
+                ArrayList<String> commandResult =
+                        BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' " +
+                                "container_" + fileUUID, "");
+//
+                if (!commandResult.get(0).isEmpty()) {
                     JSONObject taskState = new JSONObject(commandResult.get(0));
 
                     NewTaskDto newTaskDto = new NewTaskDto();
                     newTaskDto.setId(task.getId());
 
-                    if("running".equals(taskState.get("Status"))){
+                    if ("running".equals(taskState.get("Status"))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-                    else if("paused".equals(taskState.get("Status"))){
+                    else if ("paused".equals(taskState.get("Status"))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-                    else if("exited".equals(taskState.get("Status"))&&((Objects.equals(taskState.get("ExitCode"),0)))){
+                    else if ("exited".equals(taskState.get("Status")) && ((Objects.equals(taskState.get("ExitCode"), 0)))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ЗАВЕРШЕНА);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-                    else if("exited".equals(taskState.get("Status"))&&(!(Objects.equals(taskState.get("ExitCode"),0)))){
+                    else if ("exited".equals(taskState.get("Status")) && (!(Objects.equals(taskState.get("ExitCode"), 0)))) {
                         newTaskDto.setInside_status(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
                         taskService.updateInsideTaskStatus(newTaskDto);
                     }
-//                }
+                }
 
-
-
-//                return taskState.get("Status")=="running";
-            }
-            catch(Exception e ){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         });
 
     }
-
 
 
     // Отображение внешнего состояния на внутреннее с разрешением противоречий.
@@ -326,9 +317,11 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }, 10000L, dispatcherQuantumPeriodMS);
     }
 
-    /**Удаляет все архивы и папки, на которые не ссылаются задачи из БД */
-    private void brushTrash(){}
-
+    /**
+     * Удаляет все архивы и папки, на которые не ссылаются задачи из БД
+     */
+    private void brushTrash() {
+    }
 
 
     private boolean isFolderExist(String folderPath) {
@@ -342,7 +335,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         String str = taskService.getTaskById(taskId).getSource_file_name().replace(".zip", "");
 
-        return taskService.getTaskById(taskId).getSource_file_name().replace(".zip", "")+"/";
+        return taskService.getTaskById(taskId).getSource_file_name().replace(".zip", "") + "/";
     }
 
     private void checkAndPrepareFolders(Long taskId) throws Exception {
@@ -399,16 +392,15 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
     private ArrayList<String> getCmdParams(Long taskId) throws Exception {
-        ArrayList <String> params = new ArrayList<>();
+        ArrayList<String> params = new ArrayList<>();
 
-        try{
+        try {
 
 //        String workDir = getTaskUnZipDir(taskId);
 
-            Path argsPath= Paths.get(getTaskUnZipDir(taskId)+this.argsFileName);
+            Path argsPath = Paths.get(getTaskUnZipDir(taskId) + this.argsFileName);
             params = (ArrayList<String>) Files.readAllLines(argsPath);
-        }
-        catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -423,23 +415,21 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         StringBuilder params = new StringBuilder();
 
-        if(hasTaskCmdParams(taskId)){
+        if (hasTaskCmdParams(taskId)) {
 
-            ArrayList<String > arrParams = getCmdParams(taskId);
-            arrParams.forEach(param->{
+            ArrayList<String> arrParams = getCmdParams(taskId);
+            arrParams.forEach(param -> {
                 params.append(param);
                 params.append(" ");
             });
         }
 
 
-
-
         try (FileWriter writer = new FileWriter(dir2UpZip + "/Dockerfile", false)) {
             writer.write("FROM python\n");
             writer.write("WORKDIR /code\n");
             writer.write("COPY . .\n");
-            writer.write("CMD python3 Main.py "+params+" \n");
+            writer.write("CMD python3 Main.py " + params + " \n");
 
             writer.flush();
         } catch (Exception e) {
@@ -461,12 +451,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
     private boolean hasTaskCmdParams(Long taskId) throws Exception {
-        Path argsPath= Paths.get(getTaskUnZipDir(taskId)+this.argsFileName);
+        Path argsPath = Paths.get(getTaskUnZipDir(taskId) + this.argsFileName);
         return Files.exists(argsPath);
     }
 
 
-    private boolean isTaskRunInDocker(Long taskId) throws Exception{
+    private boolean isTaskRunInDocker(Long taskId) throws Exception {
 
         //        sudo docker ps -aqf "ancestor=2da48882-61a9-4a26-8399-39d4f5d97a60" контейнер по образу
 //        sudo docker ps  -aqf "id=c8ebce292681"  - данные по контейнеру
@@ -480,13 +470,18 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 //        if(containersFromImage.size()>=1){
 
-            ArrayList<String> commandResult =
-                    BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
-                            "container_"+fileUUID,"");
+        ArrayList<String> commandResult =
+                BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' " +
+                        "container_" + fileUUID, "");
+
+        if(!commandResult.get(0).isEmpty()){
 
             JSONObject taskState = new JSONObject(commandResult.get(0));
 
             return "running".equals(taskState.get("Status"));
+        }
+
+        return false;
 
 
 //        }
@@ -546,8 +541,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
             // DONE_TODO  -d добавить
             ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker run -d " +
-                    "--mount source=vol_"+taskUUID+",target=/code " +
-                    " --name container_"+taskUUID+" "+
+                    "--mount source=vol_" + taskUUID + ",target=/code " +
+                    " --name container_" + taskUUID + " " +
                     taskUUID, "");
 
             NewTaskDto newTaskDto = new NewTaskDto();
@@ -591,7 +586,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         sendUserTaskQueuesToMill();
 
-        log.info("Задач на выполнении {}",millTaskList.size());
+        log.info("Задач на выполнении {}", millTaskList.size());
 
         // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
 
@@ -647,10 +642,10 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
 
-
-
-    /** Проверяет список millTaskList на завершённые или ошибочные программы(в докере).
-     * По окончании работы метода список millTaskList содержит только выполняющиеся задачи*/
+    /**
+     * Проверяет список millTaskList на завершённые или ошибочные программы(в докере).
+     * По окончании работы метода список millTaskList содержит только выполняющиеся задачи
+     */
 
     private void updateMillTaskList() {
 
@@ -677,7 +672,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         taskToRemove.forEach(task -> {
             millTaskList.remove(task);
-            removeTaskWithSaveResult( task.getId());
+            removeTaskWithSaveResult(task.getId());
         });
 
 
@@ -686,11 +681,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
 
-    /**Удаляет задачу: образ, контейнер, но сохраняет исходники, данные, итог. Итогом может быть
+    /**
+     * Удаляет задачу: образ, контейнер, но сохраняет исходники, данные, итог. Итогом может быть
      * как логи, так и файлы, а также и первое и второе. Всё это хранится в отдельной папке. Задача может
      * быть удалена из-за ошибок, поэтому пользователь, скорее всего, перезагрузит исходники или данные. При
      * перезагрузке новых данных
-     * */
+     */
     private void removeTaskWithSaveResult(Long taskId) {
         try {
 
@@ -699,9 +695,9 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
             ArrayList<String> containersFromImage =
-                    BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+taskUUID ,"");
+                    BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='" + taskUUID, "");
 
-            containersFromImage.forEach(container->{
+            containersFromImage.forEach(container -> {
                 try {
                     BashTools.bashCommand("echo 'q'|sudo -S docker rm " + container, "");
                 } catch (Exception e) {
@@ -756,7 +752,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             runningUsersSet.add(t.getUser_id());
         });
 
-        Set<Long> newWaitingUsers = UserQueues.keySet();
+        Set<Long> newWaitingUsers = new HashSet<>(UserQueues.keySet()) ;
 
         newWaitingUsers.removeAll(runningUsersSet);
 
@@ -766,7 +762,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
             LinkedList<Task> firstTasks = new LinkedList<>();
             UserQueues.forEach((k, v) -> {
-                if(v.size()!=0){
+                if (v.size() != 0) {
                     firstTasks.add(v.getFirst());
                 }
             });
@@ -900,12 +896,20 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         ArrayList<Task> taskQueue = taskService.getTasksByStatus(TaskStatusEnum.УДАЛЕНА);
 
-        taskQueue.forEach(task -> {
-            if(UserQueues.get(task.getUser_id()).size()!=0){
-                UserQueues.get(task.getUser_id()).removeIf(t->t.getId()==task.getId());
+        try{
+            taskQueue.forEach(task -> {
+                if (UserQueues.get(task.getUser_id()).size() != 0) {
+                    UserQueues.get(task.getUser_id()).removeIf(t -> t.getId() == task.getId());
 
-            }
-        });
+                }
+            });
+
+        }
+        catch (Exception e){
+            e.printStackTrace();
+            int a =1;
+        }
+
 
 //        Set<Task> toRemove = new HashSet<>();
 //
@@ -999,9 +1003,9 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
             ArrayList<String> containersFromImage =
-                    BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+taskUUID ,"");
+                    BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='" + taskUUID, "");
 
-            containersFromImage.forEach(container->{
+            containersFromImage.forEach(container -> {
                 try {
                     BashTools.bashCommand("echo 'q'|sudo -S docker rm " + container, "");
                 } catch (Exception e) {
