@@ -477,7 +477,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         ArrayList<String> containersFromImage =
                 BashTools.bashCommand("echo 'q'|sudo -S docker ps -aqf 'ancestor='"+fileUUID ,"");
 
-        if(containersFromImage.size()==1){
+        if(containersFromImage.size()>=1){
 
             ArrayList<String> commandResult =
                     BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
@@ -489,16 +489,17 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
         }
-        else{
-            // Должен быть 1 контейнер на 1 образ
-            ArrayList<String> commandResult =
-                    BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
-                            containersFromImage.get(0),"");
+        else {
+//            // Должен быть 1 контейнер на 1 образ
+//            ArrayList<String> commandResult =
+//                    BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' "+
+//                            containersFromImage.get(0),"");
+//
+//            JSONObject taskState = new JSONObject(commandResult.get(0));
 
-            JSONObject taskState = new JSONObject(commandResult.get(0));
-
-            return taskState.get("Status")=="running";
+            return false;
         }
+
 
 //        return true;
     }
@@ -587,6 +588,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         updateMillTaskList();
 
         sendUserTaskQueuesToMill();
+
+        log.info("Задач на выполнении {}",millTaskList.size());
 
         // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
 
@@ -760,7 +763,9 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
             LinkedList<Task> firstTasks = new LinkedList<>();
             UserQueues.forEach((k, v) -> {
-                firstTasks.add(v.getFirst());
+                if(v.size()!=0){
+                    firstTasks.add(v.getFirst());
+                }
             });
 
             if (freePositionCounter < newWaitingUsers.size()) {
@@ -893,7 +898,10 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         ArrayList<Task> taskQueue = taskService.getTasksByStatus(TaskStatusEnum.УДАЛЕНА);
 
         taskQueue.forEach(task -> {
-            UserQueues.get(task.getUser_id()).removeIf(t->t.getId()==task.getId());
+            if(UserQueues.get(task.getUser_id()).size()!=0){
+                UserQueues.get(task.getUser_id()).removeIf(t->t.getId()==task.getId());
+
+            }
         });
 
 //        Set<Task> toRemove = new HashSet<>();

@@ -64,7 +64,7 @@ public class BashTools {
             Process process = pr.start();
             process.waitFor();
 
-            log.info("Успешный запуск!");
+//            log.info("Успешный запуск!");
 
             return (ArrayList<String>) Files.readAllLines(tmpCommandResult);
 
