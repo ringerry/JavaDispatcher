@@ -569,6 +569,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     // Основная логика диспетчера
     private void dispatcherQuantum() throws Exception {
 
+//        mappingOutside2InsideTaskState();
+
 
         // Полное соответсвие с БД на момент обновления
         prepareFolders();
@@ -588,52 +590,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         // Переделать по нормальному: как каждые 10 секунд не доставать все задачи?
 
 
-//        checkTaskCompleteOrHaveTheErrors();
-
-//        // Первый запуск или обошли круг
-//        if (this.curQuantumAtRaundRobin == 0/*&&UserQueues.size()!=0*/) {
-//            //Сердце диспетчера!
-//
-//            if (millTaskList.size() < Constanta.serverTasksLimit) {
-//                // Место на запуск есть
-//                runAllNeededTaskToRunningTaskList();
-//            }
-//
-//            Task firstTask = roundRobinTaskQueue.getFirst();
-//
-////            roundRobinTaskQueue.addLast(firstTask);
-//
-//            if (isDockerImageExist(firstTask.getId())) {
-//                if (!isTaskRun(firstTask.getId())) {
-//                    if (roundRobinCurrenTask == null) {
-//                        roundRobinCurrenTask = firstTask;
-//                    } else {
-//                        pauseTask(roundRobinCurrenTask.getId());
-//                        roundRobinTaskQueue.addLast(roundRobinCurrenTask);
-//                        roundRobinCurrenTask = firstTask;
-//                    }
-//                    roundRobinTaskQueue.removeFirst();
-//                    runTask(firstTask.getId());
-//                } else {
-//                    log.error("Задача уже запущена");
-//                }
-//
-//            } else {
-//                log.error("Образа задачи не существует");
-//            }
-//
-//        }
-//
-//        // Каждые quantumsAtRaundRobin квантов задачи сменяются
-//        this.curQuantumAtRaundRobin = this.curQuantumAtRaundRobin % this.quantumsAtRaundRobin;
-//
-//
-////        if (taskQueue.size()!=0){
-////            log.info("Задача {} в очереди",taskQueue.get(0).getName());
-////        }
-
 //        mappingInside2OutsideTaskState();
-//        mappingOutside2InsideTaskState();
+
 
 
     }
@@ -825,6 +783,10 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                         }
                     }
 
+                    if(UserQueues.size()==0){
+                        canSendToMill.set(false);
+                    }
+
                 }
 
                 /*} else {
@@ -887,10 +849,11 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
             try {
                 taskQueue.forEach(task -> {
-                    if (UserQueues.get(task.getUser_id()).size() != 0) {
+                    if(UserQueues.containsKey(task.getUser_id())&&UserQueues.get(task.getUser_id()).size() != 0)
+//                    if (UserQueues.get(task.getUser_id()).size() != 0) {
                         UserQueues.get(task.getUser_id()).removeIf(t -> t.getId() == task.getId());
 
-                    }
+//                    }
                 });
             } catch (Exception e) {
                 e.printStackTrace();
