@@ -26,6 +26,8 @@ public class BashTools {
         return Files.exists(path);
     }
 
+    public static String getTmpFileDir(){return tmpFileDir;}
+
     public static ArrayList<String> bashCommand(String command, String dir) throws IOException, InterruptedException {
 
 

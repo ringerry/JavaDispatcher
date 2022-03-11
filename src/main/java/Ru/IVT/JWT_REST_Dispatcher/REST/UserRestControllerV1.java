@@ -5,6 +5,7 @@ import Ru.IVT.JWT_REST_Dispatcher.DTO.UserDto;
 import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.DispathcerEnginge;
 import Ru.IVT.JWT_REST_Dispatcher.DispatcherLogic.Impl.DispatcherEngineImpl;
 import Ru.IVT.JWT_REST_Dispatcher.JwtDispatcherApplication;
+import Ru.IVT.JWT_REST_Dispatcher.Model.InsideTaskStatusEnum;
 import Ru.IVT.JWT_REST_Dispatcher.Model.Task;
 import Ru.IVT.JWT_REST_Dispatcher.Model.User;
 import Ru.IVT.JWT_REST_Dispatcher.Security.Jwt.JwtTokenProvider;
@@ -359,28 +360,42 @@ public class UserRestControllerV1 {
             produces = MediaType.APPLICATION_OCTET_STREAM_VALUE
     )
     @ResponseBody
-    public ResponseEntity<Resource> getTaskOutput(@RequestHeader("Authorization") String token,
+    public ResponseEntity getTaskOutput(@RequestHeader("Authorization") String token,
                                                   @RequestParam(value = "TaskName") String TaskName,
-                                                  @RequestParam(value = "TaskId") Long TaskId) throws IOException {
+                                                  @RequestParam(value = "TaskId") Long TaskId) throws Exception {
         // Проверка на повторяющиеся задачи
         try{
 
-            String filename = "/home/artem/Dispatcher_files/Данные_задача_1.39f3d1fc-3202-42e4-8671-0d9b0db597ed.zip";
+            if(taskService.getTaskById(TaskId).getInside_status().equals(InsideTaskStatusEnum.ЗАВЕРШЕНА)
+                    ||taskService.getTaskById(TaskId).getInside_status().equals(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ)){
 
-            Path file = Paths.get(filename);
-            Resource resource = new UrlResource(file.toUri());
-            if (resource.exists() || resource.isReadable()) {
-//                return resource;
-            }
-            else {
-                throw new FileNotFoundException(
-                        "Could not read file: " + filename);
+                String filename = dispathcerEnginge.getTaskOutputPack(TaskId);
+
+                Path file = Paths.get(filename);
+                Resource resource = new UrlResource(file.toUri());
+                if (resource.exists() || resource.isReadable()) {
+
+                    return ResponseEntity.ok()
+                            .header(HttpHeaders.CONTENT_DISPOSITION,
+                                    "attachment; filename=\"" + resource.getFilename() + "\"")
+                            .body(resource);
+                }
+                else {
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Файл не найден");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+
+                }
             }
 
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"" + resource.getFilename() + "\"")
-                    .body(resource);
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание","Получить данные по задаче можно при ошибках и завершении, либо " +
+                    "во время выполнения консольный вывод.");
+
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+
+
 
 //            Path path = Paths.get("/home/artem/Dispatcher_files/Данные_задача_1.39f3d1fc-3202-42e4-8671-0d9b0db597ed.zip");
 
@@ -394,10 +409,79 @@ public class UserRestControllerV1 {
 //            return ResponseEntity.ok(null);
 
         }
+        catch (TaskDoesNotExistException e){
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
         catch (Exception exc){
             throw exc;
         }
     }
+
+    @GetMapping(
+            value = "task_logs",
+            produces = MediaType.APPLICATION_OCTET_STREAM_VALUE
+    )
+    @ResponseBody
+    public ResponseEntity getTaskLogs(@RequestHeader("Authorization") String token,
+                                        @RequestParam(value = "TaskName") String TaskName,
+                                        @RequestParam(value = "TaskId") Long TaskId) throws Exception {
+        // Проверка на повторяющиеся задачи
+        try{
+
+            if(taskService.getTaskById(TaskId).getInside_status().equals(InsideTaskStatusEnum.ЗАВЕРШЕНА)
+                    ||taskService.getTaskById(TaskId).getInside_status().equals(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ)
+                    ||taskService.getTaskById(TaskId).getInside_status().equals(InsideTaskStatusEnum.ВЫПОЛНЕНИЕ)
+                    ||taskService.getTaskById(TaskId).getInside_status().equals(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА)){
+
+
+                Path logsFilePath = Paths.get(BashTools.getTmpFileDir()+"Консольный_вывод.txt");
+//                Path tmpCommandResult= Paths.get(tmpFileDir+"CommandResult.txt");
+
+                FileWriter writer = new FileWriter(logsFilePath.toString(), false);
+                writer.write(dispathcerEnginge.getConsoleOutput(TaskId)+"\n");
+                writer.flush();
+                writer.close();
+
+
+
+                Resource resource = new UrlResource(logsFilePath.toUri());
+                if (resource.exists() || resource.isReadable()) {
+
+                    return ResponseEntity.ok()
+                            .header(HttpHeaders.CONTENT_DISPOSITION,
+                                    "attachment; filename=\"" + resource.getFilename() + "\"")
+                            .body(resource);
+                }
+                else {
+                    Map<Object,Object> response = new HashMap<>();
+                    response.put("Описание","Файл не найден");
+
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+
+                }
+            }
+
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание","Получить консольный вывод по задаче можно только, " +
+                    "если состояние задачи: ЗАВЕРШЕНА, ОШИБКА_ВЫПОЛНЕНИЯ, ВЫПОЛНЕНИЕ, ПРИОСТАНОВЛЕНА.");
+
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+
+        }
+        catch (TaskDoesNotExistException e){
+            Map<Object,Object> response = new HashMap<>();
+            response.put("Описание",e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+        catch (Exception exc){
+            throw exc;
+        }
+    }
+
 
 
     @PostMapping(value = "add_task",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

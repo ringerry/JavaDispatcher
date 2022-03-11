@@ -12,4 +12,6 @@ public interface DispathcerEnginge {
     String getConsoleOutput(Long taskId) throws Exception;
 
     boolean delTask(Long UserId, Long taskId) throws Exception;
+
+    String getTaskOutputPack(Long taskId) throws Exception;
 }

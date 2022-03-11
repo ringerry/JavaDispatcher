@@ -384,8 +384,9 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
     // Создаётся автоматически, при заверешении задачи
-    private void zip(final String zipFilePath, final String folderPath) throws IOException {
-        Process proc = Runtime.getRuntime().exec("zip -r " + zipFilePath + " " + folderPath);
+    private void zip(final String zipFilePath, final String folderPath) throws IOException, InterruptedException {
+        BashTools.bashCommand("echo 'q' | sudo -S zip -r "+ zipFilePath + " " + folderPath,"");
+//        Process proc = Runtime.getRuntime().exec("zip -r " + zipFilePath + " " + folderPath);
     }
 
     private ArrayList<String> getCmdParams(Long taskId) throws Exception {
@@ -838,16 +839,14 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     /**  Для каждой задачи, которая завершена успешно или по ошибке,
      * сохраняет содержимое папки ./Выход и консольный вывод в архив, который расположен по пути
      * getTaskUnZipDir(taskId). Таким образом, каждая завершённая задача имеет архив с папкой ./Выход и файлом
-     * Консольный_вывод.txt.
+     * Консольный_вывод.txt. Данная функция вызывается при запросе клиента на возвращение задачи
      * */
-    private void prepareOutputFilesIfExited() throws Exception {
 
-        ArrayList<Task> exitedTasks = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ЗАВЕРШЕНА);
-        ArrayList<Task> exitedTasksErr = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
+    public String getTaskOutputPack(Long taskId) throws Exception {
+        Task task = taskService.getTaskById(taskId);
 
-        exitedTasks.addAll(exitedTasksErr);
-
-        for(Task task: exitedTasks){
+        if(task.getInside_status().equals(InsideTaskStatusEnum.ЗАВЕРШЕНА)||
+                task.getInside_status().equals(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ)){
             String currentFolder = getTaskUnZipDir(task.getId());
             Path outDir =  Paths.get( getTaskUnZipDir(task.getId())+"Выход/");
             Path outLogs =  Paths.get( getTaskUnZipDir(task.getId())+"Выход/"+"Консольный_вывод.txt");
@@ -876,10 +875,23 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                 zip(currentFolder+"Выход",currentFolder);
             }
 
+            return outPack.toString();
         }
+        return null;
+    }
 
 
+    private void prepareOutputFilesIfExited() throws Exception {
 
+        ArrayList<Task> exitedTasks = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ЗАВЕРШЕНА);
+        ArrayList<Task> exitedTasksErr = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
+
+        exitedTasks.addAll(exitedTasksErr);
+
+        for(Task task: exitedTasks){
+
+            getTaskOutputPack(task.getId());
+        }
     }
 
     /**
