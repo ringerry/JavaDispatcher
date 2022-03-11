@@ -835,8 +835,56 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }
     }
 
+    /**  Для каждой задачи, которая завершена успешно или по ошибке,
+     * сохраняет содержимое папки ./Выход и консольный вывод в архив, который расположен по пути
+     * getTaskUnZipDir(taskId). Таким образом, каждая завершённая задача имеет архив с папкой ./Выход и файлом
+     * Консольный_вывод.txt.
+     * */
+    private void prepareOutputFilesIfExited() throws Exception {
+
+        ArrayList<Task> exitedTasks = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ЗАВЕРШЕНА);
+        ArrayList<Task> exitedTasksErr = taskService.getTasksByInsideStatus(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ);
+
+        exitedTasks.addAll(exitedTasksErr);
+
+        for(Task task: exitedTasks){
+            String currentFolder = getTaskUnZipDir(task.getId());
+            Path outDir =  Paths.get( getTaskUnZipDir(task.getId())+"Выход/");
+            Path outLogs =  Paths.get( getTaskUnZipDir(task.getId())+"Выход/"+"Консольный_вывод.txt");
+            Path outPack =  Paths.get( getTaskUnZipDir(task.getId())+"Выход.zip");
+            String taskUUID = getUUIDFromFileName(task.getSource_file_name());
+
+            if(!Files.exists(outDir)){
+                ArrayList<String> commandResult = BashTools.bashCommand("echo 'q' |  sudo -S " +
+                        "docker inspect --format='{{json .Mountpoint}}' "+"vol_"+taskUUID,"");
+
+                if (!commandResult.get(0).isEmpty()) {
+                    BashTools.bashCommand("echo 'q' |  sudo -S cp -r "+commandResult.get(0) + "/Выход"+
+                            " "+outDir,"");
+                }
+            }
+
+            if(!Files.exists(outLogs)){
+
+                FileWriter writer = new FileWriter(outLogs.toString(), false);
+                writer.write(getConsoleOutput(task.getId())+"\n");
+                writer.flush();
+                writer.close();
+            }
+
+            if(!Files.exists(outPack)){
+                zip(currentFolder+"Выход",currentFolder);
+            }
+
+        }
+
+
+
+    }
+
     /**
-     * Удаляет из очереди задачи, помеченных как удаленные, уадаляет пустые очереди
+     * Удаляет из очереди задачи, помеченных как удаленные, удаляет пустые очереди,
+     * сортирует очереди задач пользователей
      */
     private void updateUserQueues() {
 
@@ -940,9 +988,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         Task task = taskService.getTaskById(taskId);
 
         ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker logs " +
-                getUUIDFromFileName(task.getSource_file_name()), "");
+                "container_"+getUUIDFromFileName(task.getSource_file_name()), "");
 
-        return null;
+        StringBuilder res = new StringBuilder();
+        commandResult.forEach(res::append);
+
+        return res.toString();
     }
 
     @Override
