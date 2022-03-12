@@ -565,6 +565,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     }
 
     private void pauseTask(Long taskId) {
+
+//        NewTaskDto newTaskDto = new NewTaskDto();
+//        newTaskDto.setId(taskId);
+//        newTaskDto.setInside_status(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА);
+//        newTaskDto.set
+//
     }
 
 
@@ -681,10 +687,124 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         /* Привязка к пользователям */
     }
 
-    private void roundRobinUsers() {
-        /* Проверка на повторения: если в мельнице пользователи повторяются и есть ожидающие пользователи,
-         * задач которых нет в мельнице, то поставить на выполнение ожидающих пользователей
+    /** Проверка на повторения: если в мельнице пользователи повторяются и есть ожидающие пользователи,
+     * задач которых нет в мельнице, то поставить на выполнение ожидающих пользователей
+     * */
+    private void roundRobinTasks() throws Exception {
+        // Любое действие с мельницей сопровождается изменением в докере состояний образов
+
+        /* Из множества очередей пользователей вычесть множество пользователей на мельнице.
+         * Получится количество пользователей, у которых задач не запущено.
+         * Проверка на повторения: если в мельнице пользователи повторяются и есть ожидающие пользователи,
+         * задач которых нет в мельнице, то поставить на выполнение ожидающих пользователей - сделать в отдельной
+         * функции
          * */
+
+
+        // TODO Проверка на повторение - если есть ожидающие пользователи, при этом кто-то из пользователей запустил
+        //  более одной задачи, то снять с выполнения более раннюю задачу и поместить задачу ожидающего пользователя
+
+        Set<Long> runningUsersSet = new HashSet<>();
+
+
+
+
+        millTaskList.forEach((t) -> {
+            runningUsersSet.add(t.getUser_id());
+        });
+
+        Set<Long> newWaitingUsersSet = new HashSet<>(UserQueues.keySet());
+
+        newWaitingUsersSet.removeAll(runningUsersSet);
+
+        ArrayList<Long> newWaitingUsersList = new ArrayList<>(newWaitingUsersSet);
+
+
+        // Сортировка пользователей по порядку поступления задач
+        newWaitingUsersList.sort((User1, User2) -> {
+
+            if (UserQueues.get(User1).getFirst().getCreated().before(UserQueues.get(User2).getFirst().getCreated()))
+                return -1;
+            else if (UserQueues.get(User1).getFirst().getCreated().after(UserQueues.get(User2).getFirst().getCreated()))
+                return 1;
+            return 0;
+        });
+
+
+        int freePositionCounter = Constanta.serverTasksLimit - millTaskList.size();
+        if ( ( freePositionCounter > 0 ) && ( UserQueues.size() > 0 ) ) {
+
+            if (freePositionCounter <= newWaitingUsersSet.size()) {
+                // из каждой очереди в место на мельнице, состояние
+
+                for (Long UserId : newWaitingUsersList) {
+
+                    if (millTaskList.size() < Constanta.serverTasksLimit) {
+                        runTask(UserQueues.get(UserId).removeFirst().getId());
+                    } else {
+                        break;
+                    }
+
+                }
+
+            } else {
+                /* freePositionCounter>newWaitingUsersSet.size()
+                 * Тасование: берём по одной первой задаче из каждой очереди и добавляем в мельницу, до тех пор
+                 * пока вся мельница не заполнится или не закончатся задачи, состояние
+                 * */
+
+//                ArrayList<Task> allTheQueueTasks = taskService.getTasksByStatus(TaskStatusEnum.В_ОЧЕРЕДИ);
+//
+//
+//                if (allTheQueueTasks.size() > freePositionCounter) {
+
+
+                AtomicBoolean canSendToMill = new AtomicBoolean(true);
+
+                // TODO возможно зацикливание из-за пустой очереди
+                while (canSendToMill.get()) {
+
+
+                    updateUserQueues();
+                    ArrayList<Long> UsersList = new ArrayList<>(UserQueues.keySet());
+
+                    // Сортировка пользователей по дате создания первой задачи в очереди
+                    UsersList.sort((User1, User2) -> {
+
+                        if (UserQueues.get(User1).getFirst().getCreated().before(UserQueues.get(User2).getFirst().getCreated()))
+                            return -1;
+                        else if (UserQueues.get(User1).getFirst().getCreated().after(UserQueues.get(User2).getFirst().getCreated()))
+                            return 1;
+                        return 0;
+                    });
+
+                    for (Long UserId : UsersList) {
+
+                        if (millTaskList.size() < Constanta.serverTasksLimit) {
+                            runTask(UserQueues.get(UserId).removeFirst().getId());
+                        } else {
+                            canSendToMill.set(false);
+                            break;
+                        }
+                    }
+
+                    if(UserQueues.size()==0){
+                        canSendToMill.set(false);
+                    }
+
+                }
+
+                /*} else {
+                    allTheQueueTasks.forEach((t) -> {
+                        try {
+                            runTask(UserQueues.get(t.getUser_id()).removeFirst().getId());
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }*/
+            }
+        }
     }
 
     private void sendUserTaskQueuesToMill() throws Exception {
