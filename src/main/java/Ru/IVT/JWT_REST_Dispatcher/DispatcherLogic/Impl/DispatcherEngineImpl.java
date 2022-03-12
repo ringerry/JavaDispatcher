@@ -103,6 +103,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         return hasDuplicates.get();
     }
 
+    private void clearDocker() throws IOException, InterruptedException {
+        BashTools.bashCommand("echo 'q' | sudo -S docker stop $(sudo docker ps -aq)","");
+        BashTools.bashCommand("echo 'q' | sudo -S sudo docker rm $(sudo docker ps -aq)","");
+        BashTools.bashCommand("echo 'q' | sudo -S docker volume rm $(sudo docker volume  ls)","");
+    }
+
 
     private void initUserTaskQueues() {
 
@@ -177,7 +183,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
                         BashTools.bashCommand("echo 'q'|sudo -S docker inspect --format='{{json .State }}' " +
                                 "container_" + fileUUID, "");
 //
-                if (!commandResult.get(0).isEmpty()) {
+                if ((!commandResult.isEmpty())&&!commandResult.get(0).isEmpty()) {
                     JSONObject taskState = new JSONObject(commandResult.get(0));
 
                     NewTaskDto newTaskDto = new NewTaskDto();
@@ -384,8 +390,9 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
 
     // Создаётся автоматически, при заверешении задачи
-    private void zip(final String zipFilePath, final String folderPath) throws IOException, InterruptedException {
-        BashTools.bashCommand("echo 'q' | sudo -S zip -r "+ zipFilePath + " " + folderPath,"");
+    private void zip(final String relZipFilePath, final String folderPath) throws IOException, InterruptedException {
+//        BashTools.bashCommand("echo 'q' | sudo -S zip -r "+ relZipFilePath + " " + folderPath,"");
+        BashTools.bashCommand("cd "+folderPath+" && (echo 'q' | sudo -S zip -r ./"+relZipFilePath+" ./"+relZipFilePath+")","");
 //        Process proc = Runtime.getRuntime().exec("zip -r " + zipFilePath + " " + folderPath);
     }
 
@@ -540,6 +547,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             // DONE_TODO  -d добавить
             ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker run -d " +
                     "--mount source=vol_" + taskUUID + ",target=/code " +
+//                    "--log-driver syslog "+
                     " --name container_" + taskUUID + " " +
                     taskUUID, "");
 
@@ -836,6 +844,8 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }
     }
 
+
+
     /**  Для каждой задачи, которая завершена успешно или по ошибке,
      * сохраняет содержимое папки ./Выход и консольный вывод в архив, который расположен по пути
      * getTaskUnZipDir(taskId). Таким образом, каждая завершённая задача имеет архив с папкой ./Выход и файлом
@@ -848,7 +858,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         if(task.getInside_status().equals(InsideTaskStatusEnum.ЗАВЕРШЕНА)||
                 task.getInside_status().equals(InsideTaskStatusEnum.ОШИБКА_ВЫПОЛНЕНИЯ)){
             String currentFolder = getTaskUnZipDir(task.getId());
-            Path outDir =  Paths.get( getTaskUnZipDir(task.getId())+"Выход/");
+            Path outDir =  Paths.get( getTaskUnZipDir(task.getId())+"Выход/"+"Выход");
             Path outLogs =  Paths.get( getTaskUnZipDir(task.getId())+"Выход/"+"Консольный_вывод.txt");
             Path outPack =  Paths.get( getTaskUnZipDir(task.getId())+"Выход.zip");
             String taskUUID = getUUIDFromFileName(task.getSource_file_name());
@@ -872,7 +882,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             }
 
             if(!Files.exists(outPack)){
-                zip(currentFolder+"Выход",currentFolder);
+                zip("Выход",currentFolder);
             }
 
             return outPack.toString();
@@ -997,10 +1007,12 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
     @Override
     public String getConsoleOutput(Long taskId) throws Exception {
 
+        // TODO пустые логи при ошибках в программе, если ошибок нет логи выводятся. Почему не все логи работают?
+
         Task task = taskService.getTaskById(taskId);
 
-        ArrayList<String> commandResult = BashTools.bashCommand("echo 'q'|sudo -S docker logs " +
-                "container_"+getUUIDFromFileName(task.getSource_file_name()), "");
+        ArrayList<String> commandResult = BashTools.bashCommand("echo 'q' | sudo -S docker logs " +
+                "container_"+getUUIDFromFileName(task.getSource_file_name()),"");
 
         StringBuilder res = new StringBuilder();
         commandResult.forEach(res::append);

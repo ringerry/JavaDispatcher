@@ -355,6 +355,9 @@ public class UserRestControllerV1 {
     }
 
 
+    //TODO возвращать нормальную ошибку, если задачи не существует, как вернуть при
+    // produces = MediaType.APPLICATION_OCTET_STREAM_VALUE
+
     @GetMapping(
             value = "task_output",
             produces = MediaType.APPLICATION_OCTET_STREAM_VALUE
@@ -437,7 +440,7 @@ public class UserRestControllerV1 {
                     ||taskService.getTaskById(TaskId).getInside_status().equals(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА)){
 
 
-                Path logsFilePath = Paths.get(BashTools.getTmpFileDir()+"Консольный_вывод.txt");
+                Path logsFilePath = Paths.get(BashTools.getTmpFileDir()+"Konsolny_vyvod.txt");
 //                Path tmpCommandResult= Paths.get(tmpFileDir+"CommandResult.txt");
 
                 FileWriter writer = new FileWriter(logsFilePath.toString(), false);
