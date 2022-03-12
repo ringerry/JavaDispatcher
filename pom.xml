@@ -11,6 +11,7 @@
     <groupId>Ru.IVT</groupId>
     <artifactId>JWT_REST_API_Dispatcher_Server_App_2</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
     <name>JWT_REST_API_Dispatcher_Server_App_2</name>
     <description>JWT based spring security REST API</description>
 
@@ -136,11 +137,47 @@
     </dependencies>
 
 
-    <packaging>jar</packaging>
+<!--    <packaging>jar</packaging>-->
+
+
+
 
     <build>
         <finalName>${artifactId}</finalName>
         <plugins>
+
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${project.parent.version}</version>
+
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+
+            </plugin>
+
+
+
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-jar-plugin</artifactId>-->
+<!--                <configuration>-->
+<!--                    <archive>-->
+<!--                        <manifest>-->
+<!--                            <addClasspath>true</addClasspath>-->
+<!--                            <classpathPrefix>libs/</classpathPrefix>-->
+<!--                            <mainClass>-->
+<!--                                com.baeldung.executable.ExecutableMavenJar-->
+<!--                            </mainClass>-->
+<!--                        </manifest>-->
+<!--                    </archive>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
 
 
 <!--                    <plugin>-->
