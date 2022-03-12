@@ -139,14 +139,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }
 
         UserQueues.forEach((UserId, taskList) -> {
-            taskList.sort((task1, task2) -> {
-
-                if (task1.getCreated().before(task2.getCreated()))
-                    return -1;
-                else if (task1.getCreated().after(task2.getCreated()))
-                    return 1;
-                return 0;
-            });
+            taskList.sort(this::taskComparator);
         });
 
     }
@@ -716,7 +709,6 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
             runningUsersSet.add(t.getUser_id());
         });
 
-
         Set<Long> newWaitingUsersSet = new HashSet<>(UserQueues.keySet());
 
         newWaitingUsersSet.removeAll(runningUsersSet);
@@ -904,10 +896,46 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
         }
     }
 
+
+
+    private int taskComparator(Task task1, Task task2){
+        if(task1.getInside_status().equals(InsideTaskStatusEnum.В_ОЧЕРЕДИ)
+                && task2.getInside_status().equals(InsideTaskStatusEnum.В_ОЧЕРЕДИ)){
+
+            if (task1.getUpdated().before(task2.getUpdated()))
+                return -1;
+            else if (task1.getUpdated().after(task2.getUpdated()))
+                return 1;
+            return 0;
+        }
+        else if(task1.getInside_status().equals(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА)
+                && task2.getInside_status().equals(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА)){
+            if (task1.getUpdated().before(task2.getUpdated()))
+                return -1;
+            else if (task1.getUpdated().after(task2.getUpdated()))
+                return 1;
+            return 0;
+        }
+
+        else if(task1.getInside_status().equals(InsideTaskStatusEnum.В_ОЧЕРЕДИ)
+                && task2.getInside_status().equals(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА)){
+            return -1;
+
+        }
+
+        else if(task1.getInside_status().equals(InsideTaskStatusEnum.ПРИОСТАНОВЛЕНА)
+                && task2.getInside_status().equals(InsideTaskStatusEnum.В_ОЧЕРЕДИ)){
+            return 1;
+        }
+
+        return 0;
+    }
+
     /**
      * Удаляет из очереди задачи, помеченных как удаленные, удаляет пустые очереди,
      * сортирует очереди задач пользователей
      */
+
     private void updateUserQueues() {
 
         // За время работы задачи могли удалить, поэтому каждый раз приводим в соответсвие с состоянием из БД
@@ -976,14 +1004,7 @@ public class DispatcherEngineImpl implements DispathcerEnginge {
 
         if (!UserQueues.isEmpty()){
             UserQueues.forEach((UserId, taskList) -> {
-                taskList.sort((task1, task2) -> {
-
-                    if (task1.getCreated().before(task2.getCreated()))
-                        return -1;
-                    else if (task1.getCreated().after(task2.getCreated()))
-                        return 1;
-                    return 0;
-                });
+                taskList.sort(this::taskComparator);
             });
         }
 
